@@ -78,6 +78,7 @@ export const App: React.FC = () => {
                 <ProtectedRoute>
                   <MainLayout>
                     <Routes>
+                      <Route path="/dashboard" element={<Dashboard />} />
                       <Route path="/datasets" element={<Datasets />} />
                       <Route path="/profile" element={<ProfilePage />} />
                       <Route path="/profile/:datasetId" element={<ProfilePage />} />

@@ -14,7 +14,8 @@ import {
   ShieldCheck,
   History as HistoryIcon,
   Menu,
-  X
+  X,
+  LayoutDashboard
 } from 'lucide-react';
 import { HealthStatus } from '../types';
 import { useAuth } from '../context/AuthContext';
@@ -177,6 +178,18 @@ export const Navbar: React.FC<NavbarProps> = ({ health, loading }) => {
                         <span className="text-[#7E454B] dark:text-[#9E5A61] font-bold">SUPABASE JWT</span>
                       </div>
                     </div>
+
+                    <NavLink
+                      to="/"
+                      onClick={() => setIsProfileOpen(false)}
+                      className="w-full flex items-center justify-between px-3 py-2 text-xs font-mono font-semibold text-[#2B2827] dark:text-[#F0EDEA] bg-[#F6F4F0] dark:bg-[#121114] hover:bg-[#EFECE6] dark:hover:bg-[#222026] rounded-lg transition-colors border border-[#E5E0D8] dark:border-[#29262C]"
+                    >
+                      <div className="flex items-center gap-2">
+                        <LayoutDashboard className="w-3.5 h-3.5 text-[#7E454B] dark:text-[#9E5A61]" />
+                        <span>Dashboard</span>
+                      </div>
+                      <span className="text-[10px] text-[#6E6966] dark:text-[#9E9793]">→</span>
+                    </NavLink>
                   </div>
 
                   {/* 2. SYSTEM STATUS SECTION */}
@@ -292,6 +305,18 @@ export const Navbar: React.FC<NavbarProps> = ({ health, loading }) => {
             WORKFLOW NAVIGATION
           </div>
           <div className="grid grid-cols-1 gap-1 font-mono text-xs">
+            <NavLink
+              to="/"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className={`flex items-center gap-2.5 px-3 py-2 rounded-lg font-mono text-xs transition-colors ${
+                location.pathname === '/' || location.pathname === '/dashboard'
+                  ? 'bg-[#7E454B] text-white font-semibold'
+                  : 'text-[#6E6966] dark:text-[#9E9793] hover:bg-[#F6F4F0] dark:hover:bg-[#19181C] text-[#2B2827] dark:text-[#F0EDEA]'
+              }`}
+            >
+              <LayoutDashboard className="w-4 h-4 flex-shrink-0" />
+              <span>Dashboard</span>
+            </NavLink>
             {navItems.map((item) => {
               const Icon = item.icon;
               const active = isNavActive(item.basePath);
