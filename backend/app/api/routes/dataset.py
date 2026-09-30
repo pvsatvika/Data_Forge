@@ -25,6 +25,7 @@ from app.models.schemas import (
     DatasetProfile,
     SemanticAnalysisResponse,
     CleaningPlanResponse,
+    CreatePlanRequest,
     PlanPreviewResponse,
     ExecutionResponse,
     ValidationReportResponse,
@@ -311,9 +312,10 @@ async def get_latest_analysis(
 @router.post("/datasets/{dataset_id}/plan", response_model=CleaningPlanResponse, status_code=status.HTTP_201_CREATED)
 async def create_cleaning_plan(
     dataset_id: str,
+    request_data: Optional[CreatePlanRequest] = None,
     db: Session = Depends(get_db)
 ):
-    """Construct a validated CleaningPlan from the latest Groq AI analysis."""
+    """Construct a validated CleaningPlan from Groq AI analysis or user-selected transformations."""
     db_dataset = db.query(DatasetModel).filter(DatasetModel.id == dataset_id).first()
     if not db_dataset:
         raise HTTPException(
@@ -334,6 +336,14 @@ async def create_cleaning_plan(
             detail=f"No AI semantic analysis found for dataset '{dataset_id}'. Run AI analysis first."
         )
 
+    selected_items = request_data.selected_transformations if request_data else None
+
+    if selected_items is not None and len(selected_items) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Select at least one transformation to continue."
+        )
+
     column_types = {}
     if db_dataset.profile_json:
         try:
@@ -345,7 +355,18 @@ async def create_cleaning_plan(
     analysis_response = SemanticAnalysisResponse.model_validate(json.loads(db_analysis.result_json))
     plan_id = f"plan_{uuid.uuid4().hex[:12]}"
 
-    plan_response = CleaningPlanBuilder.build_plan_from_analysis(analysis_response, plan_id, column_types=column_types)
+    plan_response = CleaningPlanBuilder.build_plan_from_analysis(
+        analysis_response,
+        plan_id,
+        column_types=column_types,
+        selected_transformations=selected_items
+    )
+
+    if len(plan_response.transformations) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Select at least one transformation to continue."
+        )
 
     db_plan = PlanModel(
         id=plan_response.plan_id,
@@ -588,8 +609,14 @@ async def execute_approved_plan(
     storage_path = Path(db_dataset.storage_path)
     df_orig = load_dataset_dataframe(str(storage_path), db_dataset.file_type)
 
-    # Ensure Version 0 is recorded in DB
-    ensure_version_zero(db, db_dataset, df_orig)
+    # Ensure Version 0 is recorded in DB safely
+    try:
+        ensure_version_zero(db, db_dataset, df_orig)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Failed to create Version 0 Parquet snapshot: {str(e)}"
+        )
 
     # Execute simulation to get transformed DataFrame & diffs
     _, _, cell_diffs, _ = run_dry_run_simulation(df_orig, plan_obj.transformations)
@@ -639,13 +666,19 @@ async def execute_approved_plan(
         )
 
     # Commit new Parquet version
-    new_version = commit_new_version(
-        db=db,
-        dataset=db_dataset,
-        df_cleaned=df_cleaned,
-        plan_id=plan_obj.plan_id,
-        cell_diffs=cell_diffs
-    )
+    try:
+        new_version = commit_new_version(
+            db=db,
+            dataset=db_dataset,
+            df_cleaned=df_cleaned,
+            plan_id=plan_obj.plan_id,
+            cell_diffs=cell_diffs
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Failed to commit new version: {str(e)}"
+        )
 
     # Update plan status to EXECUTED
     plan_obj.status = "executed"

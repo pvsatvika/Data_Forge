@@ -5,6 +5,7 @@ import {
   DatasetProfile,
   SemanticAnalysisResponse,
   CleaningPlanResponse,
+  TransformationPlanItem,
   PlanPreviewResponse,
   ExecutionResponse,
   ValidationReportResponse,
@@ -63,8 +64,9 @@ export const apiService = {
     return response.data;
   },
 
-  createCleaningPlan: async (datasetId: string): Promise<CleaningPlanResponse> => {
-    const response = await apiClient.post<CleaningPlanResponse>(`/plan/${datasetId}`);
+  createCleaningPlan: async (datasetId: string, selectedTransformations?: TransformationPlanItem[]): Promise<CleaningPlanResponse> => {
+    const body = selectedTransformations ? { selected_transformations: selectedTransformations } : undefined;
+    const response = await apiClient.post<CleaningPlanResponse>(`/plan/${datasetId}`, body);
     return response.data;
   },
 

@@ -131,6 +131,9 @@ class InformationLossSummary(BaseModel):
         description="Project-defined engineering loss index from 0.0 (no loss) to 1.0 (heavy loss)"
     )
 
+class CreatePlanRequest(BaseModel):
+    selected_transformations: Optional[List[TransformationPlanItem]] = None
+
 class CleaningPlanResponse(BaseModel):
     plan_id: str
     dataset_id: str

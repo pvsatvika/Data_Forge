@@ -12,10 +12,11 @@ class CleaningPlanBuilder:
     def build_plan_from_analysis(
         analysis: SemanticAnalysisResponse,
         plan_id: str,
-        column_types: Optional[Dict[str, str]] = None
+        column_types: Optional[Dict[str, str]] = None,
+        selected_transformations: Optional[List[TransformationPlanItem]] = None
     ) -> CleaningPlanResponse:
         """
-        Convert AI analysis recommendations into a validated CleaningPlan.
+        Convert AI analysis recommendations or explicitly user-selected transformations into a validated CleaningPlan.
         Validates every operation against the deterministic registry allow-list and parameters.
         Enforces type compatibility for numeric/categorical columns and calculates RiskSummary.
         """
@@ -25,7 +26,22 @@ class CleaningPlanBuilder:
         med_cnt = 0
         high_cnt = 0
 
-        for rec in analysis.recommendations:
+        if selected_transformations is not None:
+            items_to_process = selected_transformations
+        else:
+            items_to_process = [
+                TransformationPlanItem(
+                    column=rec.column,
+                    operation=rec.operation,
+                    reason=rec.reason,
+                    confidence=rec.confidence,
+                    risk=rec.risk,
+                    parameters=rec.parameters
+                )
+                for rec in analysis.recommendations
+            ]
+
+        for rec in items_to_process:
             col_type = col_types.get(rec.column, "")
             try:
                 # Enforce transformation registry validation with column type checks

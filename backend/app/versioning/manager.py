@@ -25,6 +25,35 @@ def calculate_file_sha256(file_path: Path) -> str:
             hasher.update(chunk)
     return hasher.hexdigest()
 
+def prepare_dataframe_for_parquet(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Safely prepare a Pandas DataFrame for Parquet serialization.
+    Detects object columns with mixed or incompatible Python value types
+    (e.g., integers mixed with strings) and converts them to string representation.
+    Preserves native data types (int, float, bool, datetime, pure strings) without altering source values.
+    Works strictly on an in-memory copy of the DataFrame.
+    """
+    import pyarrow as pa
+
+    df_out = df.copy()
+
+    for col in df_out.columns:
+        if pd.api.types.is_object_dtype(df_out[col]):
+            try:
+                pa.Array.from_pandas(df_out[col])
+            except (pa.ArrowInvalid, pa.ArrowTypeError, TypeError, ValueError):
+                df_out[col] = df_out[col].apply(lambda x: None if pd.isna(x) else str(x))
+
+    # Comprehensive fallback verification for table serialization
+    try:
+        pa.Table.from_pandas(df_out)
+    except (pa.ArrowInvalid, pa.ArrowTypeError, TypeError, ValueError):
+        for col in df_out.columns:
+            if pd.api.types.is_object_dtype(df_out[col]):
+                df_out[col] = df_out[col].apply(lambda x: None if pd.isna(x) else str(x))
+
+    return df_out
+
 def ensure_version_zero(db: Session, dataset: DatasetModel, df_orig: pd.DataFrame) -> VersionModel:
     """
     Ensure Version 0 (Original version) is created and stored as Parquet.
@@ -39,10 +68,17 @@ def ensure_version_zero(db: Session, dataset: DatasetModel, df_orig: pd.DataFram
 
     versions_dir = get_dataset_versions_dir(dataset.id)
     v0_path = versions_dir / "v0.parquet"
-    
-    # Save original dataframe as Parquet v0
-    df_orig.to_parquet(v0_path, index=False)
-    sha256_hash = calculate_file_sha256(v0_path)
+
+    # Safely prepare dataframe copy for Parquet serialization
+    df_v0 = prepare_dataframe_for_parquet(df_orig)
+
+    try:
+        df_v0.to_parquet(v0_path, index=False)
+        sha256_hash = calculate_file_sha256(v0_path)
+    except Exception as e:
+        if v0_path.exists():
+            v0_path.unlink()
+        raise ValueError(f"Failed to write Version 0 Parquet file: {str(e)}")
 
     v0 = VersionModel(
         id=f"ver_{uuid.uuid4().hex[:12]}",
@@ -57,9 +93,17 @@ def ensure_version_zero(db: Session, dataset: DatasetModel, df_orig: pd.DataFram
         pipeline_id="original_ingestion",
         status="active"
     )
-    db.add(v0)
-    db.commit()
-    db.refresh(v0)
+
+    try:
+        db.add(v0)
+        db.commit()
+        db.refresh(v0)
+    except Exception as e:
+        db.rollback()
+        if v0_path.exists():
+            v0_path.unlink()
+        raise ValueError(f"Database error committing Version 0 record: {str(e)}")
+
     return v0
 
 def commit_new_version(
@@ -77,9 +121,16 @@ def commit_new_version(
     versions_dir = get_dataset_versions_dir(dataset.id)
     version_file_path = versions_dir / f"v{new_version_num}.parquet"
 
-    # Write Parquet file
-    df_cleaned.to_parquet(version_file_path, index=False)
-    sha256_hash = calculate_file_sha256(version_file_path)
+    # Safely prepare dataframe copy for Parquet serialization
+    df_to_save = prepare_dataframe_for_parquet(df_cleaned)
+
+    try:
+        df_to_save.to_parquet(version_file_path, index=False)
+        sha256_hash = calculate_file_sha256(version_file_path)
+    except Exception as e:
+        if version_file_path.exists():
+            version_file_path.unlink()
+        raise ValueError(f"Failed to write Version {new_version_num} Parquet file: {str(e)}")
 
     # Find parent version record
     parent_v = (
