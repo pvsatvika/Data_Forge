@@ -26,9 +26,9 @@ const navigation = [
 
 export const Sidebar: React.FC = () => {
   return (
-    <aside className="w-60 bg-white border-r border-[#3A3A38]/20 p-4 flex flex-col justify-between select-none">
+    <aside className="w-60 bg-[#F6F4F0] dark:bg-[#121114] border-r border-[#E5E0D8] dark:border-white/10 p-4 flex flex-col justify-between select-none transition-colors duration-150">
       <nav className="space-y-1">
-        <div className="px-2 py-1.5 font-mono text-[10px] font-bold text-[#5A5A55] uppercase tracking-widest border-b border-[#3A3A38]/10 mb-2">
+        <div className="px-2 py-1.5 font-mono text-[10px] font-bold text-[#6E6966] dark:text-[#9E9793] uppercase tracking-widest border-b border-[#E5E0D8] dark:border-white/10 mb-2">
           OPERATIONAL PIPELINE
         </div>
         {navigation.map((item) => {
@@ -38,10 +38,10 @@ export const Sidebar: React.FC = () => {
               key={item.path}
               to={item.path}
               className={({ isActive }) =>
-                `flex items-center justify-between px-3 py-2 text-xs font-medium transition-all rounded-none border ${
+                `flex items-center justify-between px-3 py-2 text-xs font-medium transition-all rounded-lg ${
                   isActive
-                    ? 'bg-[#1A3C2B] text-white border-[#1A3C2B] font-semibold'
-                    : 'text-[#5A5A55] border-transparent hover:bg-[#F7F7F5] hover:text-[#181816]'
+                    ? 'bg-[#7E454B] text-white shadow-sm font-semibold'
+                    : 'text-[#6E6966] dark:text-[#9E9793] hover:bg-[#EFECE6] dark:hover:bg-[#19181C] hover:text-[#2B2827] dark:hover:text-[#F0EDEA]'
                 }`
               }
             >
@@ -56,12 +56,12 @@ export const Sidebar: React.FC = () => {
       </nav>
 
       {/* Principle Callout Card */}
-      <div className="p-3 bg-[#F7F7F5] border border-[#3A3A38]/20 space-y-1.5 font-mono text-[10px]">
-        <div className="flex items-center gap-1.5 text-[#1A3C2B] font-bold uppercase tracking-wider">
-          <SlidersHorizontal className="w-3 h-3" />
+      <div className="p-3.5 bg-white dark:bg-[#19181C] border border-[#E5E0D8] dark:border-white/10 rounded-xl space-y-1.5 font-mono text-[10px] shadow-sm">
+        <div className="flex items-center gap-1.5 text-[#7E454B] font-bold uppercase tracking-wider">
+          <SlidersHorizontal className="w-3.5 h-3.5" />
           SAFETY GATEWAY
         </div>
-        <p className="text-[#5A5A55] leading-normal font-sans text-[11px]">
+        <p className="text-[#6E6966] dark:text-[#9E9793] leading-normal font-sans text-[11px]">
           AI models generate declarative recommendations. Execution is strictly restricted to allow-listed Python functions following human approval.
         </p>
       </div>

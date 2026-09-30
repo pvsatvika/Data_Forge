@@ -4,40 +4,50 @@
 
 :root {
   font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-  color-scheme: light;
+  color-scheme: light dark;
 }
 
 body {
   margin: 0;
-  background-color: #F7F7F5;
-  color: #181816;
-  background-image: 
-    linear-gradient(to right, rgba(58, 58, 56, 0.05) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(58, 58, 56, 0.05) 1px, transparent 1px);
-  background-size: 32px 32px;
+  background-color: #F6F4F0;
+  color: #2B2827;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-/* Custom crisp technical scrollbars */
+.dark body {
+  background-color: #121114;
+  color: #F0EDEA;
+}
+
+/* Custom refined scrollbars */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #F7F7F5;
-  border-left: 1px solid rgba(58, 58, 56, 0.1);
+  background: #F6F4F0;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: #121114;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #C2C2BC;
-  border-radius: 0px;
+  background: #D5D0C8;
+  border-radius: 4px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #2A272E;
+  border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #1A3C2B;
+  background: #7E454B;
 }
 
-/* Technical Hairline Border Helper */
-.border-grid {
-  border-color: rgba(58, 58, 56, 0.2);
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #7E454B;
 }
+

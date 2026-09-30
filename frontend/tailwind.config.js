@@ -1,5 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 export default {
+  darkMode: 'class',
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
@@ -8,44 +9,36 @@ export default {
     extend: {
       fontFamily: {
         grotesk: ['"Space Grotesk"', 'sans-serif'],
-        sans: ['"Plus Jakarta Sans"', 'General Sans', 'system-ui', 'sans-serif'],
+        sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
         mono: ['"JetBrains Mono"', 'monospace'],
       },
       colors: {
-        paper: {
-          DEFAULT: '#F7F7F5',
+        burgundy: {
+          DEFAULT: '#7E454B',
+          hover: '#6A393E',
+          active: '#582E33',
+          light: '#94535A',
+          subtle: 'rgba(126, 69, 75, 0.12)',
+        },
+        warm: {
+          bg: '#F6F4F0',
           card: '#FFFFFF',
-          panel: '#EFEFEA',
-          subtle: '#E6E6E0',
+          panel: '#EFECE6',
+          border: '#E5E0D8',
+          text: '#2B2827',
+          muted: '#6E6966',
         },
-        forest: {
-          DEFAULT: '#1A3C2B',
-          hover: '#122C1F',
-          light: '#285840',
-        },
-        coral: {
-          DEFAULT: '#FF8C69',
-          dark: '#E06B48',
-        },
-        mint: {
-          DEFAULT: '#9EFFBF',
-          dark: '#059669',
-        },
-        gold: {
-          DEFAULT: '#F4D35E',
-          dark: '#D97706',
-        },
-        grid: {
-          DEFAULT: 'rgba(58, 58, 56, 0.2)',
-          subtle: 'rgba(58, 58, 56, 0.08)',
-        },
-        ink: {
-          DEFAULT: '#181816',
-          muted: '#5A5A55',
-          subtle: '#8C8C85',
+        console: {
+          bg: '#121114',
+          card: '#19181C',
+          panel: '#222026',
+          border: '#29262C',
+          text: '#F0EDEA',
+          muted: '#9E9793',
         }
       }
     },
   },
   plugins: [],
 }
+

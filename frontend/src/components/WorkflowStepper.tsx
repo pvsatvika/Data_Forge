@@ -18,10 +18,10 @@ const steps: { key: WorkflowStep; code: string; label: string }[] = [
 
 export const WorkflowStepper: React.FC<WorkflowStepperProps> = ({ currentStep = 'profile' }) => {
   return (
-    <div className="bg-white border border-[#3A3A38]/20 p-3 mb-6 select-none">
-      <div className="font-mono text-[9px] font-bold text-[#5A5A55] mb-2 uppercase tracking-widest flex items-center justify-between">
+    <div className="bg-white dark:bg-[#19181C] border border-[#E5E0D8] dark:border-white/10 p-3.5 mb-6 select-none transition-colors duration-150 rounded-xl shadow-sm">
+      <div className="font-mono text-[9px] font-bold text-[#6E6966] dark:text-[#9E9793] mb-2 uppercase tracking-widest flex items-center justify-between">
         <span>AGENTIC DATA CLEANING LIFECYCLE</span>
-        <span className="text-[#1A3C2B]">DETERMINISTIC BOUNDARY VERIFIED</span>
+        <span className="text-[#7E454B]">DETERMINISTIC BOUNDARY VERIFIED</span>
       </div>
       <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5">
         {steps.map((step) => {
@@ -29,10 +29,10 @@ export const WorkflowStepper: React.FC<WorkflowStepperProps> = ({ currentStep = 
           return (
             <div
               key={step.key}
-              className={`p-2 border text-center transition-colors ${
+              className={`p-2 border text-center transition-colors rounded-lg ${
                 isActive
-                  ? 'bg-[#1A3C2B] text-white border-[#1A3C2B] font-bold'
-                  : 'bg-[#F7F7F5] text-[#5A5A55] border-[#3A3A38]/15'
+                  ? 'bg-[#7E454B] text-white border-[#7E454B] font-bold shadow-sm'
+                  : 'bg-[#EFECE6] dark:bg-[#121114] text-[#6E6966] dark:text-[#9E9793] border-[#E5E0D8] dark:border-white/10'
               }`}
             >
               <span className="font-mono text-[10px] block opacity-75">{step.code}</span>
@@ -44,3 +44,4 @@ export const WorkflowStepper: React.FC<WorkflowStepperProps> = ({ currentStep = 
     </div>
   );
 };
+
