@@ -129,6 +129,11 @@ export const apiService = {
     return response.data;
   },
 
+  clearHistory: async (datasetId: string): Promise<{ dataset_id: string; message: string; cleared_records: number }> => {
+    const response = await apiClient.post<{ dataset_id: string; message: string; cleared_records: number }>(`/history/${datasetId}/clear`);
+    return response.data;
+  },
+
   getDownloadUrl: (datasetId: string, version?: number): string => {
     const query = version !== undefined ? `?version=${version}` : '';
     return `${API_BASE_URL}/download/${datasetId}${query}`;

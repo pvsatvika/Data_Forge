@@ -72,3 +72,14 @@ def test_download_active_and_version_endpoints(client):
     # Invalid version download -> 404
     dl_bad = client.get(f"/api/v1/download/{dataset_id}?version=99")
     assert dl_bad.status_code == 404
+
+def test_clear_dataset_history(client):
+    csv_bytes = b"id,val\n1,a\n"
+    upload_resp = client.post("/api/v1/upload", files={"file": ("clear.csv", csv_bytes, "text/csv")})
+    dataset_id = upload_resp.json()["id"]
+
+    clear_resp = client.post(f"/api/v1/history/{dataset_id}/clear")
+    assert clear_resp.status_code == 200
+    assert clear_resp.json()["dataset_id"] == dataset_id
+    assert "successfully cleared" in clear_resp.json()["message"]
+

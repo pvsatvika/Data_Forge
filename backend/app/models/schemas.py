@@ -212,3 +212,10 @@ class RollbackResponse(BaseModel):
     message: str
     sha256: str
     rolled_back_at: datetime = Field(default_factory=datetime.utcnow)
+
+class ClearHistoryResponse(BaseModel):
+    dataset_id: str
+    message: str
+    cleared_records: int
+    cleared_at: datetime = Field(default_factory=datetime.utcnow)
+

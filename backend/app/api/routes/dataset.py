@@ -18,7 +18,8 @@ from app.db.models import (
     PlanModel,
     VersionModel,
     ValidationModel,
-    RollbackEventModel
+    RollbackEventModel,
+    ChangeLogModel
 )
 from app.models.schemas import (
     DatasetMetadata,
@@ -32,7 +33,8 @@ from app.models.schemas import (
     DatasetHistoryResponse,
     VersionItem,
     RollbackRequest,
-    RollbackResponse
+    RollbackResponse,
+    ClearHistoryResponse
 )
 from app.security.auth import get_current_user, AuthenticatedUser
 from app.security.file_validation import (
@@ -836,3 +838,65 @@ async def download_dataset_version(
             filename=out_name,
             media_type="text/csv"
         )
+
+@router.post("/history/{dataset_id}/clear", response_model=ClearHistoryResponse)
+@router.post("/datasets/{dataset_id}/history/clear", response_model=ClearHistoryResponse)
+@router.delete("/history/{dataset_id}", response_model=ClearHistoryResponse)
+@router.delete("/datasets/{dataset_id}/history", response_model=ClearHistoryResponse)
+async def clear_dataset_history(
+    dataset_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Clear version history, change logs, and rollback events for an owned dataset.
+    Preserves active version state & original baseline files while removing audit chain logs.
+    Enforces authenticated user dataset ownership.
+    """
+    db_dataset = get_user_dataset_or_404(dataset_id, current_user.id, db)
+
+    # 1. Delete change logs
+    deleted_change_logs = (
+        db.query(ChangeLogModel)
+        .filter(ChangeLogModel.dataset_id == dataset_id)
+        .delete(synchronize_session=False)
+    )
+
+    # 2. Delete rollback events
+    deleted_rollback_events = (
+        db.query(RollbackEventModel)
+        .filter(RollbackEventModel.dataset_id == dataset_id)
+        .delete(synchronize_session=False)
+    )
+
+    # 3. Delete non-active VersionModel records (preserve current active version and version 0)
+    non_active_versions = (
+        db.query(VersionModel)
+        .filter(
+            VersionModel.dataset_id == dataset_id,
+            VersionModel.version_number != db_dataset.current_version,
+            VersionModel.version_number != 0
+        )
+        .all()
+    )
+
+    deleted_versions_count = len(non_active_versions)
+    for v in non_active_versions:
+        try:
+            p = Path(v.file_path)
+            if p.exists() and p != Path(db_dataset.storage_path):
+                p.unlink()
+        except Exception:
+            pass
+        db.delete(v)
+
+    db.commit()
+
+    total_cleared = deleted_change_logs + deleted_rollback_events + deleted_versions_count
+
+    return ClearHistoryResponse(
+        dataset_id=dataset_id,
+        message=f"History records successfully cleared for dataset '{dataset_id}'.",
+        cleared_records=total_cleared
+    )
+
