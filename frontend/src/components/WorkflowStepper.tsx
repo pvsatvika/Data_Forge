@@ -5,50 +5,39 @@ interface WorkflowStepperProps {
   currentStep?: WorkflowStep;
 }
 
-const steps: { key: WorkflowStep; label: string }[] = [
-  { key: 'profile', label: 'PROFILE' },
-  { key: 'understand', label: 'UNDERSTAND' },
-  { key: 'plan', label: 'PLAN' },
-  { key: 'simulate', label: 'SIMULATE' },
-  { key: 'approve', label: 'APPROVE' },
-  { key: 'clean', label: 'CLEAN' },
-  { key: 'validate', label: 'VALIDATE' },
-  { key: 'rollback', label: 'ROLLBACK' },
+const steps: { key: WorkflowStep; code: string; label: string }[] = [
+  { key: 'profile', code: '01', label: 'PROFILE' },
+  { key: 'understand', code: '02', label: 'UNDERSTAND' },
+  { key: 'plan', code: '03', label: 'PLAN' },
+  { key: 'simulate', code: '04', label: 'SIMULATE' },
+  { key: 'approve', code: '05', label: 'APPROVE' },
+  { key: 'clean', code: '06', label: 'CLEAN' },
+  { key: 'validate', code: '07', label: 'VALIDATE' },
+  { key: 'rollback', code: '08', label: 'ROLLBACK' },
 ];
 
 export const WorkflowStepper: React.FC<WorkflowStepperProps> = ({ currentStep = 'profile' }) => {
   return (
-    <div className="bg-slate-800/80 border border-slate-700/80 rounded-xl p-4 mb-6">
-      <div className="text-xs font-medium text-slate-400 mb-3 uppercase tracking-wider">
-        Agentic Execution Pipeline Lifecycle
+    <div className="bg-white border border-[#3A3A38]/20 p-3 mb-6 select-none">
+      <div className="font-mono text-[9px] font-bold text-[#5A5A55] mb-2 uppercase tracking-widest flex items-center justify-between">
+        <span>AGENTIC DATA CLEANING LIFECYCLE</span>
+        <span className="text-[#1A3C2B]">DETERMINISTIC BOUNDARY VERIFIED</span>
       </div>
-      <div className="flex items-center justify-between overflow-x-auto gap-2 pb-2">
-        {steps.map((step, idx) => {
+      <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5">
+        {steps.map((step) => {
           const isActive = step.key === currentStep;
           return (
-            <React.Fragment key={step.key}>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <div
-                  className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
-                    isActive
-                      ? 'bg-sky-500 text-slate-950 ring-2 ring-sky-400/50'
-                      : 'bg-slate-700 text-slate-300'
-                  }`}
-                >
-                  {idx + 1}
-                </div>
-                <span
-                  className={`text-xs font-semibold tracking-wide ${
-                    isActive ? 'text-sky-400 font-bold' : 'text-slate-400'
-                  }`}
-                >
-                  {step.label}
-                </span>
-              </div>
-              {idx < steps.length - 1 && (
-                <div className="h-0.5 w-6 bg-slate-700 flex-shrink-0" />
-              )}
-            </React.Fragment>
+            <div
+              key={step.key}
+              className={`p-2 border text-center transition-colors ${
+                isActive
+                  ? 'bg-[#1A3C2B] text-white border-[#1A3C2B] font-bold'
+                  : 'bg-[#F7F7F5] text-[#5A5A55] border-[#3A3A38]/15'
+              }`}
+            >
+              <span className="font-mono text-[10px] block opacity-75">{step.code}</span>
+              <span className="font-mono text-[10px] tracking-wider block font-semibold">{step.label}</span>
+            </div>
           );
         })}
       </div>

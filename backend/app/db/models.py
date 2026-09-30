@@ -6,6 +6,7 @@ class DatasetModel(Base):
     __tablename__ = "datasets"
 
     id = Column(String(64), primary_key=True, index=True)
+    owner_id = Column(String(255), nullable=True, index=True)
     original_filename = Column(String(255), nullable=False)
     file_type = Column(String(10), nullable=False)
     file_size = Column(Integer, nullable=False)

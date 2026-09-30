@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { supabase } from './supabase';
 import {
   HealthStatus,
   Dataset,
@@ -20,6 +21,21 @@ export const apiClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+});
+
+// Intercept requests to dynamically attach Supabase Bearer token from existing session
+apiClient.interceptors.request.use(async (config) => {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.access_token) {
+      config.headers.Authorization = `Bearer ${session.access_token}`;
+    }
+  } catch (e) {
+    // If fetching session fails, proceed with request (backend will handle unauthenticated error)
+  }
+  return config;
+}, (error) => {
+  return Promise.reject(error);
 });
 
 export const apiService = {

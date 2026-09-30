@@ -88,76 +88,84 @@ export const Datasets: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-bold text-white flex items-center gap-2">
-          <Database className="w-5 h-5 text-sky-400" />
-          Dataset Ingestion
-        </h2>
-        <p className="text-xs text-slate-400">Upload CSV or XLSX enterprise datasets for automated profiling & cleaning.</p>
+      {/* Header Banner */}
+      <div className="bg-white border border-[#3A3A38]/20 p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div className="font-mono text-[10px] font-bold text-[#1A3C2B] uppercase tracking-widest mb-1">
+            DATA INGESTION ENGINE
+          </div>
+          <h2 className="font-grotesk font-bold text-2xl text-[#181816] flex items-center gap-2">
+            <Database className="w-5 h-5 text-[#1A3C2B]" />
+            Enterprise Dataset Ingestion
+          </h2>
+          <p className="text-xs text-[#5A5A55] mt-1 font-sans">
+            Upload raw CSV or XLSX enterprise datasets. Calculates immutable SHA-256 hashes and stores original files safely under raw storage.
+          </p>
+        </div>
       </div>
 
       {error && (
-        <div className="p-4 bg-rose-500/10 border border-rose-500/30 rounded-xl flex items-center gap-3 text-rose-400 text-xs">
-          <AlertCircle className="w-5 h-5 flex-shrink-0" />
+        <div className="p-4 bg-[#FF8C69]/10 border border-[#FF8C69]/40 text-[#E06B48] font-mono text-xs flex items-center gap-3">
+          <AlertCircle className="w-4 h-4 flex-shrink-0" />
           <span>{error}</span>
         </div>
       )}
 
       {uploadedDataset ? (
-        <div className="bg-slate-800/80 border border-emerald-500/40 rounded-xl p-6 space-y-4 shadow-xl">
-          <div className="flex items-center gap-3 text-emerald-400">
+        <div className="bg-white border border-[#1A3C2B] p-6 space-y-4">
+          <div className="flex items-center gap-3 text-[#1A3C2B]">
             <CheckCircle2 className="w-6 h-6" />
             <div>
-              <h3 className="font-bold text-lg text-white">Dataset Successfully Uploaded</h3>
-              <p className="text-xs text-emerald-400 font-mono">Dataset ID: {uploadedDataset.id}</p>
+              <h3 className="font-grotesk font-bold text-lg text-[#181816]">Dataset Ingested Successfully</h3>
+              <p className="font-mono text-xs text-[#1A3C2B] font-bold">DATASET ID: {uploadedDataset.id}</p>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-slate-900/60 rounded-lg text-xs border border-slate-700/50">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-4 bg-[#F7F7F5] border border-[#3A3A38]/20 font-mono text-xs">
             <div>
-              <span className="text-slate-400 block">Filename</span>
-              <span className="font-medium text-white truncate block">{uploadedDataset.original_filename}</span>
+              <span className="text-[#5A5A55] block text-[10px] uppercase font-bold">FILENAME</span>
+              <span className="font-bold text-[#181816] truncate block">{uploadedDataset.original_filename}</span>
             </div>
             <div>
-              <span className="text-slate-400 block">File Size</span>
-              <span className="font-medium text-white">{formatBytes(uploadedDataset.file_size)}</span>
+              <span className="text-[#5A5A55] block text-[10px] uppercase font-bold">FILE SIZE</span>
+              <span className="font-bold text-[#181816]">{formatBytes(uploadedDataset.file_size)}</span>
             </div>
             <div>
-              <span className="text-slate-400 block">Format</span>
-              <span className="font-medium text-sky-400 uppercase">{uploadedDataset.file_type}</span>
+              <span className="text-[#5A5A55] block text-[10px] uppercase font-bold">FORMAT</span>
+              <span className="font-bold text-[#1A3C2B] uppercase">{uploadedDataset.file_type}</span>
             </div>
             <div>
-              <span className="text-slate-400 block">SHA-256 Hash</span>
-              <span className="font-mono text-[10px] text-slate-300 truncate block">{uploadedDataset.sha256}</span>
+              <span className="text-[#5A5A55] block text-[10px] uppercase font-bold">SHA-256 HASH</span>
+              <span className="font-mono text-[10px] text-[#5A5A55] truncate block">{uploadedDataset.sha256}</span>
             </div>
           </div>
 
-          <div className="flex items-center justify-between pt-2">
+          <div className="flex items-center justify-between pt-2 border-t border-[#3A3A38]/10">
             <button
               onClick={() => {
                 setUploadedDataset(null);
                 setSelectedFile(null);
               }}
-              className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-medium rounded-lg transition-colors"
+              className="px-4 py-2 bg-[#F7F7F5] hover:bg-[#EFEFEA] text-[#181816] font-mono text-xs font-bold uppercase border border-[#3A3A38]/20 transition-colors"
             >
               Upload Another File
             </button>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               <button
                 onClick={() => navigate(`/profile?id=${uploadedDataset.id}`)}
-                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white text-xs font-semibold rounded-lg flex items-center gap-2 transition-colors"
+                className="px-4 py-2 bg-white hover:bg-[#F7F7F5] text-[#181816] font-mono text-xs font-bold uppercase border border-[#3A3A38]/30 flex items-center gap-2 transition-colors"
               >
-                <Eye className="w-4 h-4 text-sky-400" />
+                <Eye className="w-3.5 h-3.5 text-[#1A3C2B]" />
                 View Profile
               </button>
               <button
                 onClick={() => navigate(`/analysis?id=${uploadedDataset.id}`)}
-                className="px-5 py-2.5 bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold rounded-lg flex items-center gap-2 shadow-lg shadow-sky-600/20 transition-all"
+                className="px-5 py-2 bg-[#1A3C2B] hover:bg-[#122C1F] text-white font-mono text-xs font-bold uppercase flex items-center gap-2 transition-all border border-[#1A3C2B]"
               >
-                <Sparkles className="w-4 h-4" />
+                <Sparkles className="w-3.5 h-3.5" />
                 Analyze with AI
-                <ArrowRight className="w-4 h-4" />
+                <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
@@ -166,7 +174,7 @@ export const Datasets: React.FC = () => {
         <div
           onDragOver={handleDragOver}
           onDrop={handleDrop}
-          className="border-2 border-dashed border-slate-700 hover:border-sky-500/50 bg-slate-800/30 rounded-xl p-10 flex flex-col items-center justify-center text-center transition-colors"
+          className="border-2 border-dashed border-[#3A3A38]/30 hover:border-[#1A3C2B] bg-white p-10 flex flex-col items-center justify-center text-center transition-colors select-none"
         >
           <input
             type="file"
@@ -176,23 +184,23 @@ export const Datasets: React.FC = () => {
             className="hidden"
           />
 
-          <div className="p-4 bg-sky-500/10 text-sky-400 rounded-full mb-4">
-            <Upload className="w-8 h-8" />
+          <div className="p-3 bg-[#F7F7F5] text-[#1A3C2B] border border-[#3A3A38]/20 mb-4">
+            <Upload className="w-6 h-6" />
           </div>
 
           {selectedFile ? (
             <div className="space-y-3 mb-4">
-              <div className="flex items-center gap-2 text-white font-medium text-sm bg-slate-800 border border-slate-700 px-4 py-2 rounded-lg">
-                <FileText className="w-4 h-4 text-sky-400" />
+              <div className="flex items-center gap-2 font-mono text-xs font-bold text-[#181816] bg-[#F7F7F5] border border-[#3A3A38]/20 px-4 py-2">
+                <FileText className="w-4 h-4 text-[#1A3C2B]" />
                 <span>{selectedFile.name}</span>
-                <span className="text-xs text-slate-400">({formatBytes(selectedFile.size)})</span>
+                <span className="text-[#5A5A55] font-normal">({formatBytes(selectedFile.size)})</span>
               </div>
             </div>
           ) : (
             <>
-              <h3 className="font-semibold text-white mb-1">Select Enterprise Dataset</h3>
-              <p className="text-xs text-slate-400 max-w-sm mb-4">
-                Drag and drop your CSV or XLSX file here, or click to browse. Max file size: 25MB.
+              <h3 className="font-grotesk font-bold text-[#181816] text-base mb-1">Select Enterprise Dataset</h3>
+              <p className="font-sans text-xs text-[#5A5A55] max-w-sm mb-4">
+                Drag and drop your CSV or XLSX file here, or browse from disk. Maximum file size: 25MB.
               </p>
             </>
           )}
@@ -201,7 +209,7 @@ export const Datasets: React.FC = () => {
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
-              className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 font-medium rounded-lg text-xs transition-colors disabled:opacity-50"
+              className="px-4 py-2 bg-[#F7F7F5] hover:bg-[#EFEFEA] text-[#181816] font-mono text-xs font-bold uppercase border border-[#3A3A38]/20 transition-colors disabled:opacity-50"
             >
               {selectedFile ? 'Change File' : 'Browse Files'}
             </button>
@@ -210,16 +218,16 @@ export const Datasets: React.FC = () => {
               <button
                 onClick={handleUpload}
                 disabled={uploading}
-                className="px-5 py-2 bg-sky-600 hover:bg-sky-500 text-white font-semibold rounded-lg text-xs flex items-center gap-2 shadow-lg shadow-sky-600/20 transition-colors disabled:opacity-50"
+                className="px-5 py-2 bg-[#1A3C2B] hover:bg-[#122C1F] text-white font-mono text-xs font-bold uppercase flex items-center gap-2 transition-colors disabled:opacity-50 border border-[#1A3C2B]"
               >
                 {uploading ? (
                   <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
                     <span>Uploading...</span>
                   </>
                 ) : (
                   <>
-                    <Upload className="w-4 h-4" />
+                    <Upload className="w-3.5 h-3.5" />
                     <span>Upload & Process</span>
                   </>
                 )}
@@ -230,73 +238,73 @@ export const Datasets: React.FC = () => {
       )}
 
       {/* Previously Uploaded Enterprise Datasets Table */}
-      <div className="bg-slate-800/60 border border-slate-700/60 rounded-xl overflow-hidden shadow-xl space-y-0">
-        <div className="p-4 bg-slate-800 border-b border-slate-700 flex justify-between items-center">
-          <h3 className="font-bold text-white text-sm flex items-center gap-2">
-            <Database className="w-4 h-4 text-sky-400" />
+      <div className="bg-white border border-[#3A3A38]/20 overflow-hidden space-y-0">
+        <div className="p-4 bg-[#F7F7F5] border-b border-[#3A3A38]/20 flex justify-between items-center">
+          <h3 className="font-grotesk font-bold text-[#181816] text-sm flex items-center gap-2">
+            <Database className="w-4 h-4 text-[#1A3C2B]" />
             Uploaded Enterprise Datasets ({datasetsList.length})
           </h3>
           <button
             onClick={fetchDatasets}
-            className="p-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors text-xs flex items-center gap-1.5"
-            title="Refresh list"
+            className="px-3 py-1 bg-white hover:bg-[#EFEFEA] text-[#5A5A55] border border-[#3A3A38]/20 font-mono text-xs flex items-center gap-1.5 transition-colors"
+            title="Refresh dataset list"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${loadingList ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-3 h-3 ${loadingList ? 'animate-spin' : ''}`} />
             <span>Refresh</span>
           </button>
         </div>
 
         {loadingList ? (
-          <div className="p-8 text-center text-slate-400 text-xs">
-            <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-sky-400" />
-            <span>Loading uploaded datasets...</span>
+          <div className="p-8 text-center text-[#5A5A55] font-mono text-xs">
+            <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2 text-[#1A3C2B]" />
+            <span>Querying dataset registry...</span>
           </div>
         ) : datasetsList.length === 0 ? (
-          <div className="p-8 text-center text-slate-400 text-xs">
-            No datasets uploaded yet. Upload a dataset above to get started.
+          <div className="p-8 text-center text-[#5A5A55] font-mono text-xs">
+            No datasets uploaded yet. Ingest a dataset above to get started.
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-slate-300">
-              <thead className="bg-slate-900/80 text-slate-400 uppercase font-semibold text-[10px] tracking-wider border-b border-slate-700/80">
+            <table className="w-full text-left font-mono text-xs text-[#181816]">
+              <thead className="bg-[#F7F7F5] text-[#5A5A55] uppercase font-bold text-[10px] tracking-wider border-b border-[#3A3A38]/20">
                 <tr>
-                  <th className="py-3 px-4">Dataset ID</th>
-                  <th className="py-3 px-4">Filename</th>
-                  <th className="py-3 px-4">Size</th>
-                  <th className="py-3 px-4">Format</th>
-                  <th className="py-3 px-4">Upload Date</th>
-                  <th className="py-3 px-4 text-right">Actions</th>
+                  <th className="py-2.5 px-4">Dataset ID</th>
+                  <th className="py-2.5 px-4">Filename</th>
+                  <th className="py-2.5 px-4">Size</th>
+                  <th className="py-2.5 px-4">Format</th>
+                  <th className="py-2.5 px-4">Upload Timestamp</th>
+                  <th className="py-2.5 px-4 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-700/40">
+              <tbody className="divide-y divide-[#3A3A38]/10">
                 {datasetsList.map((ds) => (
-                  <tr key={ds.id} className="hover:bg-slate-700/20 transition-colors">
-                    <td className="py-3 px-4 font-mono font-bold text-sky-400">{ds.id}</td>
-                    <td className="py-3 px-4 font-medium text-white max-w-xs truncate">{ds.original_filename}</td>
-                    <td className="py-3 px-4 text-slate-300 font-mono">{formatBytes(ds.file_size)}</td>
-                    <td className="py-3 px-4">
-                      <span className="px-2 py-0.5 bg-sky-500/10 text-sky-400 border border-sky-500/30 rounded font-mono text-[10px] uppercase font-semibold">
+                  <tr key={ds.id} className="hover:bg-[#F7F7F5] transition-colors">
+                    <td className="py-2.5 px-4 font-bold text-[#1A3C2B]">{ds.id}</td>
+                    <td className="py-2.5 px-4 font-sans font-medium text-[#181816] max-w-xs truncate">{ds.original_filename}</td>
+                    <td className="py-2.5 px-4 text-[#5A5A55]">{formatBytes(ds.file_size)}</td>
+                    <td className="py-2.5 px-4">
+                      <span className="px-2 py-0.5 bg-[#F7F7F5] text-[#1A3C2B] border border-[#3A3A38]/20 font-bold text-[10px] uppercase">
                         {ds.file_type}
                       </span>
                     </td>
-                    <td className="py-3 px-4 text-slate-400 font-mono text-[11px]">
+                    <td className="py-2.5 px-4 text-[#5A5A55] text-[11px]">
                       {new Date(ds.upload_timestamp).toLocaleString()}
                     </td>
-                    <td className="py-3 px-4 text-right">
+                    <td className="py-2.5 px-4 text-right">
                       <div className="flex items-center justify-end gap-2">
                         <Link
                           to={`/profile?id=${ds.id}`}
-                          className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold rounded text-xs inline-flex items-center gap-1.5 transition-colors"
+                          className="px-2.5 py-1 bg-white hover:bg-[#F7F7F5] text-[#181816] font-mono font-bold border border-[#3A3A38]/20 text-[11px] uppercase inline-flex items-center gap-1 transition-colors"
                         >
-                          <Eye className="w-3.5 h-3.5 text-sky-400" />
-                          View Profile
+                          <Eye className="w-3 h-3 text-[#1A3C2B]" />
+                          Profile
                         </Link>
                         <Link
                           to={`/analysis?id=${ds.id}`}
-                          className="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded text-xs inline-flex items-center gap-1.5 shadow-sm shadow-sky-600/20 transition-all"
+                          className="px-3 py-1 bg-[#1A3C2B] hover:bg-[#122C1F] text-white font-mono font-bold text-[11px] uppercase inline-flex items-center gap-1 transition-all border border-[#1A3C2B]"
                         >
-                          <Sparkles className="w-3.5 h-3.5" />
-                          Analyze with AI
+                          <Sparkles className="w-3 h-3" />
+                          AI Analysis
                         </Link>
                       </div>
                     </td>

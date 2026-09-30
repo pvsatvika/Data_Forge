@@ -34,6 +34,7 @@ from app.models.schemas import (
     RollbackRequest,
     RollbackResponse
 )
+from app.security.auth import get_current_user, AuthenticatedUser
 from app.security.file_validation import (
     sanitize_filename,
     validate_uploaded_file_header,
@@ -53,16 +54,41 @@ from app.versioning import (
 
 router = APIRouter(tags=["Datasets"])
 
+def get_user_dataset_or_404(dataset_id: str, current_user_id: str, db: Session) -> DatasetModel:
+    """
+    Verify dataset existence and authenticated user ownership.
+    Returns 404 if dataset does not exist or belongs to another user (hiding existence).
+    Allows seamless backward-compatible adoption of legacy unowned dev datasets.
+    """
+    db_dataset = db.query(DatasetModel).filter(DatasetModel.id == dataset_id).first()
+    if not db_dataset:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Dataset with ID '{dataset_id}' not found."
+        )
+
+    if db_dataset.owner_id is None:
+        # Local development data compatibility: associate legacy dataset to first accessing authenticated user
+        db_dataset.owner_id = current_user_id
+        db.commit()
+    elif db_dataset.owner_id != current_user_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Dataset with ID '{dataset_id}' not found."
+        )
+
+    return db_dataset
+
 @router.post("/upload", response_model=DatasetMetadata, status_code=status.HTTP_201_CREATED)
 @router.post("/datasets/upload", response_model=DatasetMetadata, status_code=status.HTTP_201_CREATED)
 async def upload_dataset(
     file: UploadFile = File(...),
+    current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Ingest a CSV or XLSX dataset file.
-    Calculates SHA-256, stores original file immutably under data/uploads/,
-    and records metadata in SQLite database.
+    Ingest a CSV or XLSX dataset file for the authenticated user.
+    Calculates SHA-256, stores original file immutably, and attaches owner_id.
     """
     if not file.filename:
         raise HTTPException(
@@ -100,6 +126,7 @@ async def upload_dataset(
 
     db_dataset = DatasetModel(
         id=dataset_id,
+        owner_id=current_user.id,
         original_filename=clean_orig_filename,
         file_type=file_ext,
         file_size=file_size,
@@ -128,39 +155,37 @@ async def upload_dataset(
 
 @router.get("/datasets", response_model=List[DatasetMetadata])
 async def list_datasets(
+    current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Retrieve all uploaded datasets ordered by upload timestamp descending."""
-    datasets = db.query(DatasetModel).order_by(DatasetModel.upload_timestamp.desc()).all()
+    """Retrieve uploaded datasets owned by the authenticated user."""
+    datasets = (
+        db.query(DatasetModel)
+        .filter(DatasetModel.owner_id == current_user.id)
+        .order_by(DatasetModel.upload_timestamp.desc())
+        .all()
+    )
     return [DatasetMetadata.model_validate(ds) for ds in datasets]
 
 @router.get("/datasets/{dataset_id}", response_model=DatasetMetadata)
 async def get_dataset(
     dataset_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Fetch dataset metadata by unique dataset ID."""
-    db_dataset = db.query(DatasetModel).filter(DatasetModel.id == dataset_id).first()
-    if not db_dataset:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Dataset with ID '{dataset_id}' not found."
-        )
+    """Fetch dataset metadata by unique dataset ID for the authenticated owner."""
+    db_dataset = get_user_dataset_or_404(dataset_id, current_user.id, db)
     return DatasetMetadata.model_validate(db_dataset)
 
 @router.get("/profile/{dataset_id}", response_model=DatasetProfile)
 @router.get("/datasets/{dataset_id}/profile", response_model=DatasetProfile)
 async def get_or_generate_profile(
     dataset_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Retrieve or generate statistical profile for a dataset."""
-    db_dataset = db.query(DatasetModel).filter(DatasetModel.id == dataset_id).first()
-    if not db_dataset:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Dataset with ID '{dataset_id}' not found."
-        )
+    """Retrieve or generate statistical profile for an owned dataset."""
+    db_dataset = get_user_dataset_or_404(dataset_id, current_user.id, db)
 
     if db_dataset.profile_status == "completed" and db_dataset.profile_json:
         try:
@@ -204,15 +229,11 @@ async def get_or_generate_profile(
 @router.post("/datasets/{dataset_id}/analyze", response_model=SemanticAnalysisResponse)
 async def analyze_dataset_with_ai(
     dataset_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Trigger Groq AI semantic analysis on dataset profile."""
-    db_dataset = db.query(DatasetModel).filter(DatasetModel.id == dataset_id).first()
-    if not db_dataset:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Dataset with ID '{dataset_id}' not found."
-        )
+    """Trigger Groq AI semantic analysis on owned dataset profile."""
+    db_dataset = get_user_dataset_or_404(dataset_id, current_user.id, db)
 
     groq_client = GroqClient()
     if not groq_client.is_configured():
@@ -276,15 +297,11 @@ async def analyze_dataset_with_ai(
 @router.get("/datasets/{dataset_id}/analyze", response_model=SemanticAnalysisResponse)
 async def get_latest_analysis(
     dataset_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Retrieve latest stored AI semantic analysis."""
-    db_dataset = db.query(DatasetModel).filter(DatasetModel.id == dataset_id).first()
-    if not db_dataset:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Dataset with ID '{dataset_id}' not found."
-        )
+    """Retrieve latest stored AI semantic analysis for owned dataset."""
+    db_dataset = get_user_dataset_or_404(dataset_id, current_user.id, db)
 
     db_analysis = (
         db.query(AnalysisModel)
@@ -313,15 +330,11 @@ async def get_latest_analysis(
 async def create_cleaning_plan(
     dataset_id: str,
     request_data: Optional[CreatePlanRequest] = None,
+    current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Construct a validated CleaningPlan from Groq AI analysis or user-selected transformations."""
-    db_dataset = db.query(DatasetModel).filter(DatasetModel.id == dataset_id).first()
-    if not db_dataset:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Dataset with ID '{dataset_id}' not found."
-        )
+    """Construct a validated CleaningPlan from Groq AI analysis for owned dataset."""
+    db_dataset = get_user_dataset_or_404(dataset_id, current_user.id, db)
 
     db_analysis = (
         db.query(AnalysisModel)
@@ -394,15 +407,11 @@ async def create_cleaning_plan(
 @router.get("/datasets/{dataset_id}/plan", response_model=CleaningPlanResponse)
 async def get_latest_cleaning_plan(
     dataset_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Retrieve the latest cleaning plan for a dataset."""
-    db_dataset = db.query(DatasetModel).filter(DatasetModel.id == dataset_id).first()
-    if not db_dataset:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Dataset with ID '{dataset_id}' not found."
-        )
+    """Retrieve the latest cleaning plan for owned dataset."""
+    db_dataset = get_user_dataset_or_404(dataset_id, current_user.id, db)
 
     db_plan = (
         db.query(PlanModel)
@@ -423,19 +432,14 @@ async def get_latest_cleaning_plan(
 @router.post("/datasets/{dataset_id}/preview", response_model=PlanPreviewResponse)
 async def preview_cleaning_plan_dry_run(
     dataset_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Run in-memory dry-run simulation against an isolated copy of the dataset.
+    Run in-memory dry-run simulation against an isolated copy of the owned dataset.
     Calculates cell diffs, transformation stats, and Information Loss Index.
-    Original uploaded dataset file remains 100% untouched on disk.
     """
-    db_dataset = db.query(DatasetModel).filter(DatasetModel.id == dataset_id).first()
-    if not db_dataset:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Dataset with ID '{dataset_id}' not found."
-        )
+    db_dataset = get_user_dataset_or_404(dataset_id, current_user.id, db)
 
     db_plan = (
         db.query(PlanModel)
@@ -495,19 +499,19 @@ async def preview_cleaning_plan_dry_run(
 @router.post("/plan/{plan_id}/approve", response_model=CleaningPlanResponse)
 async def approve_cleaning_plan(
     plan_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """
-    Approval Gate Endpoint.
-    Validates plan simulation status before approving.
-    Does NOT execute transformations on dataset files.
-    """
+    """Approval Gate Endpoint for owned dataset cleaning plan."""
     db_plan = db.query(PlanModel).filter(PlanModel.id == plan_id).first()
     if not db_plan:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Cleaning plan with ID '{plan_id}' not found."
         )
+
+    # Enforce dataset ownership check
+    get_user_dataset_or_404(db_plan.dataset_id, current_user.id, db)
 
     if db_plan.status == "draft":
         raise HTTPException(
@@ -536,15 +540,19 @@ async def approve_cleaning_plan(
 @router.post("/plan/{plan_id}/reject", response_model=CleaningPlanResponse)
 async def reject_cleaning_plan(
     plan_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Reject a cleaning plan."""
+    """Reject a cleaning plan for owned dataset."""
     db_plan = db.query(PlanModel).filter(PlanModel.id == plan_id).first()
     if not db_plan:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Cleaning plan with ID '{plan_id}' not found."
         )
+
+    # Enforce dataset ownership check
+    get_user_dataset_or_404(db_plan.dataset_id, current_user.id, db)
 
     plan_obj = CleaningPlanResponse.model_validate(json.loads(db_plan.plan_json))
     plan_obj.status = "rejected"
@@ -556,26 +564,15 @@ async def reject_cleaning_plan(
 
     return plan_obj
 
-# --- PHASE 5 EXECUTION, VALIDATION, VERSIONING & ROLLBACK ENDPOINTS ---
-
 @router.post("/execute/{dataset_id}", response_model=ExecutionResponse)
 @router.post("/datasets/{dataset_id}/execute", response_model=ExecutionResponse)
 async def execute_approved_plan(
     dataset_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """
-    Phase 5 Execution Engine.
-    Requires an APPROVED cleaning plan that completed dry-run simulation.
-    Runs validation suite. If validation passes, commits new immutable Parquet version and updates version state.
-    If validation fails, aborts commit and leaves current active version untouched.
-    """
-    db_dataset = db.query(DatasetModel).filter(DatasetModel.id == dataset_id).first()
-    if not db_dataset:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Dataset with ID '{dataset_id}' not found."
-        )
+    """Execution Engine for owned dataset with approved plan."""
+    db_dataset = get_user_dataset_or_404(dataset_id, current_user.id, db)
 
     db_plan = (
         db.query(PlanModel)
@@ -605,11 +602,9 @@ async def execute_approved_plan(
 
     preview_obj = PlanPreviewResponse.model_validate(json.loads(db_plan.preview_json))
 
-    # Load original dataset as working DataFrame
     storage_path = Path(db_dataset.storage_path)
     df_orig = load_dataset_dataframe(str(storage_path), db_dataset.file_type)
 
-    # Ensure Version 0 is recorded in DB safely
     try:
         ensure_version_zero(db, db_dataset, df_orig)
     except Exception as e:
@@ -618,10 +613,8 @@ async def execute_approved_plan(
             detail=f"Failed to create Version 0 Parquet snapshot: {str(e)}"
         )
 
-    # Execute simulation to get transformed DataFrame & diffs
     _, _, cell_diffs, _ = run_dry_run_simulation(df_orig, plan_obj.transformations)
 
-    # Work on copy for transformations
     df_cleaned = df_orig.copy()
     for item in plan_obj.transformations:
         from app.transformations import get_transformation_function, validate_transformation_parameters
@@ -629,19 +622,15 @@ async def execute_approved_plan(
         params = validate_transformation_parameters(item.operation, item.parameters)
         df_cleaned, _ = func(df_cleaned, item.column, params)
 
-    # Get profile for validation
     profile = profile_dataset_dataframe(df_orig, dataset_id)
-
-    # Run Validation Suite
     overall_status, checks = run_validation_suite(df_orig, df_cleaned, profile, plan_obj, preview_obj)
 
-    # Store validation report
     val_id = f"val_{uuid.uuid4().hex[:12]}"
     val_report = ValidationReportResponse(
         validation_id=val_id,
         dataset_id=dataset_id,
         plan_id=plan_obj.plan_id,
-        overall_status=overall_status, # PASS, WARN, FAIL
+        overall_status=overall_status,
         created_at=datetime.utcnow(),
         checks=checks
     )
@@ -656,7 +645,6 @@ async def execute_approved_plan(
     )
     db.add(db_val)
 
-    # FAIL status MUST prevent version commit!
     if overall_status == "FAIL":
         db_plan.status = "failed"
         db.commit()
@@ -665,7 +653,6 @@ async def execute_approved_plan(
             detail=f"Transformation failed automated validation suite ({len([c for c in checks if c['status']=='FAIL'])} critical failures). Version commit aborted."
         )
 
-    # Commit new Parquet version
     try:
         new_version = commit_new_version(
             db=db,
@@ -680,7 +667,6 @@ async def execute_approved_plan(
             detail=f"Failed to commit new version: {str(e)}"
         )
 
-    # Update plan status to EXECUTED
     plan_obj.status = "executed"
     db_plan.status = "executed"
     db_plan.executed_at = datetime.utcnow()
@@ -706,15 +692,11 @@ async def execute_approved_plan(
 @router.get("/datasets/{dataset_id}/validation", response_model=ValidationReportResponse)
 async def get_latest_validation_report(
     dataset_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Retrieve latest automated validation report for dataset."""
-    db_dataset = db.query(DatasetModel).filter(DatasetModel.id == dataset_id).first()
-    if not db_dataset:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Dataset with ID '{dataset_id}' not found."
-        )
+    """Retrieve latest automated validation report for owned dataset."""
+    db_dataset = get_user_dataset_or_404(dataset_id, current_user.id, db)
 
     db_val = (
         db.query(ValidationModel)
@@ -735,17 +717,12 @@ async def get_latest_validation_report(
 @router.get("/datasets/{dataset_id}/history", response_model=DatasetHistoryResponse)
 async def get_dataset_version_history(
     dataset_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Retrieve complete immutable version history for a dataset."""
-    db_dataset = db.query(DatasetModel).filter(DatasetModel.id == dataset_id).first()
-    if not db_dataset:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Dataset with ID '{dataset_id}' not found."
-        )
+    """Retrieve complete immutable version history for owned dataset."""
+    db_dataset = get_user_dataset_or_404(dataset_id, current_user.id, db)
 
-    # Ensure Version 0 exists in DB
     storage_path = Path(db_dataset.storage_path)
     if storage_path.exists():
         df_orig = load_dataset_dataframe(str(storage_path), db_dataset.file_type)
@@ -787,19 +764,11 @@ async def get_dataset_version_history(
 async def rollback_dataset_version_endpoint(
     dataset_id: str,
     request: RollbackRequest,
+    current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """
-    Rollback active dataset version to target_version.
-    Verifies target version existence and SHA-256 integrity hash.
-    Does NOT delete newer versions or files on disk.
-    """
-    db_dataset = db.query(DatasetModel).filter(DatasetModel.id == dataset_id).first()
-    if not db_dataset:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Dataset with ID '{dataset_id}' not found."
-        )
+    """Rollback active dataset version for owned dataset."""
+    db_dataset = get_user_dataset_or_404(dataset_id, current_user.id, db)
 
     try:
         updated_dataset, target_ver = perform_rollback(
@@ -827,23 +796,15 @@ async def rollback_dataset_version_endpoint(
 async def download_dataset_version(
     dataset_id: str,
     version: Optional[int] = Query(None, description="Target version number (defaults to active version)"),
+    current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """
-    Download specified or active dataset version.
-    Returns safe file stream as CSV.
-    """
-    db_dataset = db.query(DatasetModel).filter(DatasetModel.id == dataset_id).first()
-    if not db_dataset:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Dataset with ID '{dataset_id}' not found."
-        )
+    """Download specified or active dataset version for owned dataset."""
+    db_dataset = get_user_dataset_or_404(dataset_id, current_user.id, db)
 
     target_ver_num = version if version is not None else db_dataset.current_version
 
     if target_ver_num == 0:
-        # Version 0 original file
         file_path = Path(db_dataset.storage_path)
         if not file_path.exists():
             raise HTTPException(status_code=404, detail="Original dataset file not found.")
@@ -853,7 +814,6 @@ async def download_dataset_version(
             media_type="application/octet-stream"
         )
     else:
-        # Version Parquet file
         ver_record = (
             db.query(VersionModel)
             .filter(VersionModel.dataset_id == dataset_id, VersionModel.version_number == target_ver_num)
@@ -866,7 +826,6 @@ async def download_dataset_version(
         if not p_path.exists():
             raise HTTPException(status_code=404, detail=f"Version file missing on disk.")
 
-        # Convert Parquet to temporary CSV for download
         df_ver = pd.read_parquet(p_path)
         temp_csv = tempfile.NamedTemporaryFile(delete=False, suffix=".csv")
         df_ver.to_csv(temp_csv.name, index=False)

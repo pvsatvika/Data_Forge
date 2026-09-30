@@ -17,6 +17,11 @@ class Settings(BaseSettings):
     GROQ_API_KEY: str = Field(default_factory=lambda: os.getenv("GROQ_API_KEY", ""))
     GROQ_MODEL: str = Field(default_factory=lambda: os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"))
 
+    # Supabase Authentication Settings
+    SUPABASE_JWT_SECRET: str = Field(default_factory=lambda: os.getenv("SUPABASE_JWT_SECRET", ""))
+    SUPABASE_URL: str = Field(default_factory=lambda: os.getenv("SUPABASE_URL", "https://tnmdiejiumwzxcndclmc.supabase.co"))
+    SUPABASE_AUDIENCE: str = Field(default_factory=lambda: os.getenv("SUPABASE_AUDIENCE", "authenticated"))
+
     # Server & Database Settings
     HOST: str = Field(default="0.0.0.0")
     PORT: int = Field(default=8000)

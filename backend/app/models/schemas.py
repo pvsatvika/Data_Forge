@@ -11,6 +11,7 @@ class HealthResponse(BaseModel):
 
 class DatasetMetadata(BaseModel):
     id: str
+    owner_id: Optional[str] = None
     original_filename: str
     file_type: str
     file_size: int

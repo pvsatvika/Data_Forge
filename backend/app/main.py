@@ -5,8 +5,21 @@ from app.api.router import api_router
 from app.db.session import engine, Base
 from app.db.models import DatasetModel  # Ensure models register with Base
 
+from sqlalchemy import inspect, text
+
 # Create database tables if not created
 Base.metadata.create_all(bind=engine)
+
+# Migration helper: ensure owner_id column exists on datasets table for legacy databases
+try:
+    inspector = inspect(engine)
+    if "datasets" in inspector.get_table_names():
+        cols = [c["name"] for c in inspector.get_columns("datasets")]
+        if "owner_id" not in cols:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE datasets ADD COLUMN owner_id VARCHAR(255)"))
+except Exception:
+    pass
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
