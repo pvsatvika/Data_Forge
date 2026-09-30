@@ -1,11 +1,11 @@
-import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Navbar } from './components/Navbar';
 import { useHealth } from './hooks/useDataset';
 
+import { LandingPage } from './pages/Landing';
 import { LoginPage } from './pages/Login';
 import { RegisterPage } from './pages/Register';
 import { Dashboard } from './pages/Dashboard';
@@ -31,15 +31,45 @@ const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   );
 };
 
+const RootRoute: React.FC = () => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center text-white font-mono text-xs">
+        Loading DataForge Engine...
+      </div>
+    );
+  }
+
+  if (user) {
+    return (
+      <ProtectedRoute>
+        <MainLayout>
+          <Dashboard />
+        </MainLayout>
+      </ProtectedRoute>
+    );
+  }
+
+  return <LandingPage />;
+};
+
 export const App: React.FC = () => {
   return (
     <ThemeProvider>
       <AuthProvider>
         <Router>
           <Routes>
+            {/* Public Landing Page */}
+            <Route path="/landing" element={<LandingPage />} />
+            
             {/* Public Auth Routes */}
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+
+            {/* Root Route */}
+            <Route path="/" element={<RootRoute />} />
 
             {/* Protected Data Forge Application Routes */}
             <Route
@@ -48,7 +78,6 @@ export const App: React.FC = () => {
                 <ProtectedRoute>
                   <MainLayout>
                     <Routes>
-                      <Route path="/" element={<Dashboard />} />
                       <Route path="/datasets" element={<Datasets />} />
                       <Route path="/profile" element={<ProfilePage />} />
                       <Route path="/profile/:datasetId" element={<ProfilePage />} />

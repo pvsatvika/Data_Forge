@@ -95,7 +95,7 @@ export const Navbar: React.FC<NavbarProps> = ({ health, loading }) => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-2 md:gap-4">
         {/* LEFT: DataForge Logo & Name */}
         <div className="flex items-center gap-3 flex-shrink-0">
-          <NavLink to="/datasets" className="flex items-center gap-2.5 group">
+          <NavLink to="/" className="flex items-center gap-2.5 group">
             <div className="w-8 h-8 bg-[#7E454B] text-white flex items-center justify-center rounded-lg font-mono font-bold text-sm shadow-sm group-hover:bg-[#6A393E] transition-colors">
               DF
             </div>

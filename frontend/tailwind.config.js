@@ -11,6 +11,7 @@ export default {
         grotesk: ['"Space Grotesk"', 'sans-serif'],
         sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
         mono: ['"JetBrains Mono"', 'monospace'],
+        playfair: ['"Playfair Display"', 'serif'],
       },
       colors: {
         burgundy: {

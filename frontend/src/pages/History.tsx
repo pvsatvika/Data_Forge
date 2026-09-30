@@ -10,8 +10,7 @@ import {
   Download,
   RotateCcw,
   CheckCircle2,
-  FileSpreadsheet,
-  Trash2
+  FileSpreadsheet
 } from 'lucide-react';
 import { apiService } from '../services/api';
 import { DatasetHistoryResponse, VersionItem } from '../types';
@@ -29,8 +28,6 @@ export const HistoryPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [rollbackTarget, setRollbackTarget] = useState<VersionItem | null>(null);
   const [rollingBack, setRollingBack] = useState<boolean>(false);
-  const [showClearModal, setShowClearModal] = useState<boolean>(false);
-  const [clearing, setClearing] = useState<boolean>(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   const fetchHistory = () => {
@@ -85,26 +82,6 @@ export const HistoryPage: React.FC = () => {
       const msg = err?.response?.data?.detail || err?.message || 'Failed to execute version rollback.';
       setError(msg);
       setRollingBack(false);
-    }
-  };
-
-  const handleConfirmClearHistory = async () => {
-    if (!activeDatasetId) return;
-
-    setClearing(true);
-    setError(null);
-    setStatusMessage(null);
-
-    try {
-      const res = await apiService.clearHistory(activeDatasetId);
-      setClearing(false);
-      setShowClearModal(false);
-      setStatusMessage(res.message || 'Dataset change history cleared successfully.');
-      fetchHistory();
-    } catch (err: any) {
-      const msg = err?.response?.data?.detail || err?.message || 'Failed to clear dataset history.';
-      setError(msg);
-      setClearing(false);
     }
   };
 
@@ -202,23 +179,14 @@ export const HistoryPage: React.FC = () => {
                 Dataset Version Chain ({history.versions.length} versions)
               </h3>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                onClick={() => setShowClearModal(true)}
-                className="px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/30 font-mono text-xs font-bold rounded-lg flex items-center gap-2 transition-colors"
-              >
-                <Trash2 className="w-4 h-4" />
-                [ CLEAR HISTORY ]
-              </button>
-              <a
-                href={apiService.getDownloadUrl(history.dataset_id)}
-                download
-                className="px-4 py-2 bg-[#7E454B] hover:bg-[#6A393E] text-white font-mono text-xs font-bold rounded-lg flex items-center gap-2 transition-colors border border-[#7E454B]"
-              >
-                <Download className="w-4 h-4 text-white" />
-                [ DOWNLOAD CURRENT ACTIVE VERSION ]
-              </a>
-            </div>
+            <a
+              href={apiService.getDownloadUrl(history.dataset_id)}
+              download
+              className="px-4 py-2 bg-[#7E454B] hover:bg-[#6A393E] text-white font-mono text-xs font-bold rounded-lg flex items-center gap-2 transition-colors border border-[#7E454B]"
+            >
+              <Download className="w-4 h-4 text-white" />
+              [ DOWNLOAD CURRENT ACTIVE VERSION ]
+            </a>
           </div>
 
           {/* Versions Table */}
@@ -356,57 +324,6 @@ export const HistoryPage: React.FC = () => {
                   <>
                     <RotateCcw className="w-4 h-4" />
                     [ CONFIRM ROLLBACK ]
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Clear History Confirmation Modal */}
-      {showClearModal && (
-        <div className="fixed inset-0 bg-[#2B2827]/70 dark:bg-[#121114]/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white dark:bg-[#19181C] border border-[#E5E0D8] dark:border-[#29262C] rounded-xl p-6 max-w-md w-full space-y-4 shadow-2xl">
-            <div className="flex items-center gap-3 text-rose-600 dark:text-rose-400">
-              <Trash2 className="w-6 h-6" />
-              <h3 className="font-grotesk font-bold text-lg text-[#2B2827] dark:text-[#F0EDEA] uppercase tracking-tight">Clear History?</h3>
-            </div>
-
-            <p className="text-xs font-sans text-[#2B2827] dark:text-[#F0EDEA] leading-relaxed">
-              This will remove the history records associated with this account.
-            </p>
-
-            {activeDatasetId && (
-              <div className="p-3 bg-[#F6F4F0] dark:bg-[#222026] border border-[#E5E0D8] dark:border-[#29262C] rounded-lg text-[11px] text-[#6E6966] dark:text-[#9E9793] leading-relaxed space-y-1 font-sans">
-                <span className="font-mono font-bold text-[#2B2827] dark:text-[#F0EDEA] block uppercase">TARGET DATASET:</span>
-                <p className="font-mono text-[#2B2827] dark:text-[#F0EDEA] font-semibold">{activeDatasetId}</p>
-                <p>Non-active historical Parquet snapshots and audit logs will be deleted. The active version and Version 0 baseline are preserved.</p>
-              </div>
-            )}
-
-            <div className="flex items-center justify-end gap-3 pt-2 font-mono">
-              <button
-                onClick={() => setShowClearModal(false)}
-                disabled={clearing}
-                className="px-4 py-2 bg-white dark:bg-[#222026] hover:bg-[#F6F4F0] dark:hover:bg-[#2A2730] border border-[#E5E0D8] dark:border-[#29262C] text-[#2B2827] dark:text-[#F0EDEA] text-xs font-semibold rounded-lg transition-colors disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleConfirmClearHistory}
-                disabled={clearing}
-                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg text-xs flex items-center gap-2 transition-all border border-rose-600 disabled:opacity-50"
-              >
-                {clearing ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin text-white" />
-                    Clearing History...
-                  </>
-                ) : (
-                  <>
-                    <Trash2 className="w-4 h-4" />
-                    Clear History
                   </>
                 )}
               </button>

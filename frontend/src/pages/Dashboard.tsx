@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { WorkflowStepper } from '../components/WorkflowStepper';
-import { Database, ShieldAlert, Cpu, Server, ArrowRight, Activity, Sparkles, Layers, FileCheck2, BarChart3, CheckCircle2 } from 'lucide-react';
+import { Database, ShieldAlert, Cpu, Server, ArrowRight, Sparkles, Layers, FileCheck2, BarChart3 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { apiService } from '../services/api';
 import { Dataset } from '../types';
@@ -156,44 +156,6 @@ export const Dashboard: React.FC = () => {
           <p className="text-xs text-[#6E6966] dark:text-[#9E9793] leading-relaxed font-sans">
             Raw datasets remain byte-for-byte untouched. Versioned Parquet snapshots enable instant, loss-less audit rollbacks.
           </p>
-        </div>
-      </div>
-
-      {/* Subsystem Matrix */}
-      <div className="bg-white dark:bg-[#19181C] border border-[#E5E0D8] dark:border-white/10 rounded-xl p-5 shadow-sm">
-        <div className="flex items-center justify-between border-b border-[#E5E0D8] dark:border-white/10 pb-3 mb-4">
-          <h3 className="font-grotesk font-bold text-[#2B2827] dark:text-[#F0EDEA] text-sm flex items-center gap-2">
-            <Activity className="w-4 h-4 text-[#7E454B]" />
-            ARCHITECTURAL SUBSYSTEM VERIFICATION
-          </h3>
-          <span className="font-mono text-[10px] text-[#6E6966] dark:text-[#9E9793] uppercase">ALL SUBSYSTEMS VERIFIED</span>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs font-mono">
-          <div className="p-3 bg-[#F6F4F0] dark:bg-[#121114] border border-[#E5E0D8] dark:border-white/10 rounded-lg flex justify-between items-center text-[#2B2827] dark:text-[#F0EDEA]">
-            <span>FastAPI Core Server & SQLite DB</span>
-            <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
-              <CheckCircle2 className="w-3.5 h-3.5" /> VERIFIED
-            </span>
-          </div>
-          <div className="p-3 bg-[#F6F4F0] dark:bg-[#121114] border border-[#E5E0D8] dark:border-white/10 rounded-lg flex justify-between items-center text-[#2B2827] dark:text-[#F0EDEA]">
-            <span>React + Vite + Technical Minimalist UI</span>
-            <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
-              <CheckCircle2 className="w-3.5 h-3.5" /> VERIFIED
-            </span>
-          </div>
-          <div className="p-3 bg-[#F6F4F0] dark:bg-[#121114] border border-[#E5E0D8] dark:border-white/10 rounded-lg flex justify-between items-center text-[#2B2827] dark:text-[#F0EDEA]">
-            <span>Groq AI Semantic Analyzer</span>
-            <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
-              <CheckCircle2 className="w-3.5 h-3.5" /> VERIFIED
-            </span>
-          </div>
-          <div className="p-3 bg-[#F6F4F0] dark:bg-[#121114] border border-[#E5E0D8] dark:border-white/10 rounded-lg flex justify-between items-center text-[#2B2827] dark:text-[#F0EDEA]">
-            <span>Allow-listed Transformation Registry</span>
-            <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
-              <CheckCircle2 className="w-3.5 h-3.5" /> VERIFIED
-            </span>
-          </div>
         </div>
       </div>
     </div>
