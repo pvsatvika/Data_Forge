@@ -41,20 +41,62 @@ def get_transformation_function(operation: str) -> TransformationFunc:
         raise ValueError(f"Operation '{operation}' is not in the deterministic allow-list registry.")
     return TRANSFORMATION_REGISTRY[op]
 
-def validate_transformation_parameters(operation: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+def _is_numeric_value(val: Any) -> bool:
+    if isinstance(val, (int, float)) and not isinstance(val, bool):
+        return True
+    if isinstance(val, str) and val.strip() != "":
+        try:
+            float(val.strip())
+            return True
+        except ValueError:
+            return False
+    return False
+
+def validate_transformation_parameters(
+    operation: str,
+    parameters: Dict[str, Any],
+    reason: str = "",
+    column_type: str = ""
+) -> Dict[str, Any]:
     """
     Strict server-side validation for operation parameters.
-    Rejects malicious or unsupported parameters.
+    Rejects malicious or unsupported parameters while supplying safe defaults and enforcing type compatibility.
     """
     op = operation.strip().lower()
-    params = parameters or {}
+    params = dict(parameters or {})
+    reason_lower = (reason or "").lower()
+    col_type_lower = (column_type or "").lower().strip()
+    is_numeric_col = col_type_lower in ("float", "integer", "int", "numeric", "number", "double")
 
     if op == "fill_missing":
-        strategy = str(params.get("strategy", "constant")).lower()
-        if strategy not in ("constant", "mean", "median", "mode"):
-            raise ValueError(f"Invalid strategy '{strategy}' for fill_missing. Allowed: constant, mean, median, mode.")
-        if strategy == "constant" and "value" not in params:
-            raise ValueError("Parameter 'value' is required when fill_missing strategy is 'constant'.")
+        raw_strategy = params.get("strategy")
+        if raw_strategy is not None and str(raw_strategy).strip() != "":
+            strategy = str(raw_strategy).strip().lower()
+            if strategy not in ("constant", "mean", "median", "mode"):
+                raise ValueError(f"Invalid strategy '{strategy}' for fill_missing. Allowed: constant, mean, median, mode.")
+        else:
+            if "mean" in reason_lower:
+                strategy = "mean"
+            elif "median" in reason_lower:
+                strategy = "median"
+            elif "mode" in reason_lower:
+                strategy = "mode"
+            else:
+                strategy = "median" if is_numeric_col else "constant"
+
+        if strategy == "constant":
+            val = params.get("value")
+            if is_numeric_col:
+                if val is None or not _is_numeric_value(val):
+                    raise ValueError(f"Numeric column of type '{column_type}' cannot receive non-numeric constant value '{val}'.")
+                try:
+                    params["value"] = float(val) if col_type_lower in ("float", "double", "numeric") else int(float(val))
+                except (ValueError, TypeError):
+                    raise ValueError(f"Constant value '{val}' is incompatible with numeric column type '{column_type}'.")
+            else:
+                if "value" not in params:
+                    params["value"] = ""
+
         return {"strategy": strategy, "value": params.get("value")}
 
     elif op == "replace_values":
@@ -64,9 +106,22 @@ def validate_transformation_parameters(operation: str, parameters: Dict[str, Any
         return {"mapping": mapping}
 
     elif op == "convert_type":
-        target_type = str(params.get("target_type", "")).lower()
-        if target_type not in ("string", "integer", "float", "boolean", "date"):
-            raise ValueError(f"Invalid target_type '{target_type}' for convert_type. Allowed: string, integer, float, boolean, date.")
+        raw_type = params.get("target_type")
+        if raw_type is not None and str(raw_type).strip() != "":
+            target_type = str(raw_type).strip().lower()
+            if target_type not in ("string", "integer", "float", "boolean", "date"):
+                raise ValueError(f"Invalid target_type '{target_type}' for convert_type. Allowed: string, integer, float, boolean, date.")
+        else:
+            if "int" in reason_lower or "integer" in reason_lower:
+                target_type = "integer"
+            elif "float" in reason_lower or "decimal" in reason_lower or "numeric" in reason_lower:
+                target_type = "float"
+            elif "bool" in reason_lower:
+                target_type = "boolean"
+            elif "date" in reason_lower:
+                target_type = "date"
+            else:
+                target_type = "string"
         return {"target_type": target_type}
 
     return params

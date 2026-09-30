@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Dict, Optional
 from app.models.schemas import (
     SemanticAnalysisResponse,
     TransformationPlanItem,
@@ -11,26 +11,43 @@ class CleaningPlanBuilder:
     @staticmethod
     def build_plan_from_analysis(
         analysis: SemanticAnalysisResponse,
-        plan_id: str
+        plan_id: str,
+        column_types: Optional[Dict[str, str]] = None
     ) -> CleaningPlanResponse:
         """
         Convert AI analysis recommendations into a validated CleaningPlan.
         Validates every operation against the deterministic registry allow-list and parameters.
-        Calculates plan-level RiskSummary.
+        Enforces type compatibility for numeric/categorical columns and calculates RiskSummary.
         """
         validated_items: List[TransformationPlanItem] = []
+        col_types = column_types or {}
         low_cnt = 0
         med_cnt = 0
         high_cnt = 0
 
         for rec in analysis.recommendations:
+            col_type = col_types.get(rec.column, "")
             try:
-                # Enforce transformation registry validation
+                # Enforce transformation registry validation with column type checks
                 get_transformation_function(rec.operation)
-                validated_params = validate_transformation_parameters(rec.operation, rec.parameters)
+                validated_params = validate_transformation_parameters(
+                    rec.operation, rec.parameters, rec.reason, column_type=col_type
+                )
             except ValueError:
-                # Reject un-allowlisted or invalid parameter recommendations
-                continue
+                # Auto-correct fill_missing for numeric columns if string constant was provided by LLM
+                is_numeric_col = col_type.lower() in ("float", "integer", "int", "numeric", "number", "double")
+                if rec.operation.strip().lower() == "fill_missing" and is_numeric_col:
+                    rec_reason_lower = (rec.reason or "").lower()
+                    strat = "mean" if "mean" in rec_reason_lower else "median"
+                    try:
+                        validated_params = validate_transformation_parameters(
+                            rec.operation, {"strategy": strat}, rec.reason, column_type=col_type
+                        )
+                    except ValueError:
+                        continue
+                else:
+                    # Reject un-allowlisted or uncorrectable parameter recommendations
+                    continue
 
             item = TransformationPlanItem(
                 column=rec.column,

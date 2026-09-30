@@ -90,3 +90,21 @@ def test_unsupported_operation_rejected():
 def test_unsupported_parameter_rejected():
     with pytest.raises(ValueError):
         validate_transformation_parameters("fill_missing", {"strategy": "invalid_strategy"})
+
+def test_numeric_column_string_constant_rejected():
+    with pytest.raises(ValueError):
+        validate_transformation_parameters("fill_missing", {"strategy": "constant", "value": ""}, column_type="float")
+    with pytest.raises(ValueError):
+        validate_transformation_parameters("fill_missing", {"strategy": "constant", "value": "N/A"}, column_type="integer")
+
+def test_numeric_column_numeric_constant_accepted():
+    params = validate_transformation_parameters("fill_missing", {"strategy": "constant", "value": 0.0}, column_type="float")
+    assert params == {"strategy": "constant", "value": 0.0}
+
+def test_categorical_column_string_constant_accepted():
+    params = validate_transformation_parameters("fill_missing", {"strategy": "constant", "value": "N/A"}, column_type="string")
+    assert params == {"strategy": "constant", "value": "N/A"}
+
+def test_invalid_fill_strategy_rejected():
+    with pytest.raises(ValueError):
+        validate_transformation_parameters("fill_missing", {"strategy": "invalid_strategy"})

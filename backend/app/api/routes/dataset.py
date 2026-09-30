@@ -326,10 +326,18 @@ async def create_cleaning_plan(
             detail=f"No AI semantic analysis found for dataset '{dataset_id}'. Run AI analysis first."
         )
 
+    column_types = {}
+    if db_dataset.profile_json:
+        try:
+            profile_data = json.loads(db_dataset.profile_json)
+            column_types = {col["column_name"]: col.get("inferred_type", "") for col in profile_data.get("columns", [])}
+        except Exception:
+            pass
+
     analysis_response = SemanticAnalysisResponse.model_validate(json.loads(db_analysis.result_json))
     plan_id = f"plan_{uuid.uuid4().hex[:12]}"
 
-    plan_response = CleaningPlanBuilder.build_plan_from_analysis(analysis_response, plan_id)
+    plan_response = CleaningPlanBuilder.build_plan_from_analysis(analysis_response, plan_id, column_types=column_types)
 
     db_plan = PlanModel(
         id=plan_response.plan_id,
