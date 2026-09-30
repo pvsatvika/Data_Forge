@@ -61,7 +61,7 @@ export const Navbar: React.FC<NavbarProps> = ({ health, loading }) => {
     setIsProfileOpen(false);
     setIsMobileMenuOpen(false);
     await logout();
-    navigate('/login', { replace: true });
+    navigate('/', { replace: true });
   };
 
   const getNavPath = (basePath: string) => {
@@ -96,7 +96,7 @@ export const Navbar: React.FC<NavbarProps> = ({ health, loading }) => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-2 md:gap-4">
         {/* LEFT: DataForge Logo & Name */}
         <div className="flex items-center gap-3 flex-shrink-0">
-          <NavLink to="/" className="flex items-center gap-2.5 group">
+          <NavLink to="/dashboard" className="flex items-center gap-2.5 group">
             <div className="w-8 h-8 bg-[#7E454B] text-white flex items-center justify-center rounded-lg font-mono font-bold text-sm shadow-sm group-hover:bg-[#6A393E] transition-colors">
               DF
             </div>
@@ -180,7 +180,7 @@ export const Navbar: React.FC<NavbarProps> = ({ health, loading }) => {
                     </div>
 
                     <NavLink
-                      to="/"
+                      to="/dashboard"
                       onClick={() => setIsProfileOpen(false)}
                       className="w-full flex items-center justify-between px-3 py-2 text-xs font-mono font-semibold text-[#2B2827] dark:text-[#F0EDEA] bg-[#F6F4F0] dark:bg-[#121114] hover:bg-[#EFECE6] dark:hover:bg-[#222026] rounded-lg transition-colors border border-[#E5E0D8] dark:border-[#29262C]"
                     >
@@ -306,7 +306,7 @@ export const Navbar: React.FC<NavbarProps> = ({ health, loading }) => {
           </div>
           <div className="grid grid-cols-1 gap-1 font-mono text-xs">
             <NavLink
-              to="/"
+              to="/dashboard"
               onClick={() => setIsMobileMenuOpen(false)}
               className={`flex items-center gap-2.5 px-3 py-2 rounded-lg font-mono text-xs transition-colors ${
                 location.pathname === '/' || location.pathname === '/dashboard'

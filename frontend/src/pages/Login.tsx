@@ -16,7 +16,8 @@ export const LoginPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  const from = (location.state as any)?.from?.pathname || '/';
+  const targetPath = (location.state as any)?.from?.pathname;
+  const from = (targetPath && targetPath !== '/') ? targetPath : '/dashboard';
 
   // If already logged in, redirect
   React.useEffect(() => {

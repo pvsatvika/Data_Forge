@@ -1,18 +1,40 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { ChevronRight, Sparkles } from 'lucide-react';
 
+interface LineCoord {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  pathD: string;
+}
+
 export const LandingPage: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  
+
   // 10-Second introductory loading progress state (0% -> 100%)
   const [progress, setProgress] = useState<number>(0);
   const [isLoaded, setIsLoaded] = useState<boolean>(false);
 
+  // Active hovered satellite card state (1: Top-Left, 2: Top-Right, 3: Bottom-Left, 4: Bottom-Right)
+  const [hoveredCard, setHoveredCard] = useState<number | null>(null);
+
   // Parallax tilt state for subtle cursor tracking
   const [mousePos, setMousePos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  // DOM Refs for dynamic SVG line connection calculation
+  const containerRef = useRef<HTMLDivElement>(null);
+  const card1Ref = useRef<HTMLDivElement>(null);
+  const card2Ref = useRef<HTMLDivElement>(null);
+  const card3Ref = useRef<HTMLDivElement>(null);
+  const card4Ref = useRef<HTMLDivElement>(null);
+  const heroRef = useRef<HTMLDivElement>(null);
+
+  // Computed lines state
+  const [lines, setLines] = useState<LineCoord[]>([]);
 
   useEffect(() => {
     const startTime = Date.now();
@@ -32,6 +54,105 @@ export const LandingPage: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
+  // Recalculate dynamic SVG connection paths based on actual rendered card bounding boxes
+  const updateLines = () => {
+    if (!containerRef.current || !heroRef.current) return;
+    const containerRect = containerRef.current.getBoundingClientRect();
+    const heroRect = heroRef.current.getBoundingClientRect();
+
+    if (containerRect.width === 0 || heroRect.width === 0) return;
+
+    // Target connection points on central hero card relative to hero container
+    const heroTL = {
+      x: heroRect.left - containerRect.left + heroRect.width * 0.1,
+      y: heroRect.top - containerRect.top + heroRect.height * 0.25,
+    };
+    const heroTR = {
+      x: heroRect.left - containerRect.left + heroRect.width * 0.9,
+      y: heroRect.top - containerRect.top + heroRect.height * 0.25,
+    };
+    const heroBL = {
+      x: heroRect.left - containerRect.left + heroRect.width * 0.1,
+      y: heroRect.top - containerRect.top + heroRect.height * 0.75,
+    };
+    const heroBR = {
+      x: heroRect.left - containerRect.left + heroRect.width * 0.9,
+      y: heroRect.top - containerRect.top + heroRect.height * 0.75,
+    };
+
+    const getCardPoint = (
+      ref: React.RefObject<HTMLDivElement>,
+      edge: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left'
+    ) => {
+      if (!ref.current) return { x: 0, y: 0 };
+      const r = ref.current.getBoundingClientRect();
+      if (edge === 'bottom-right') {
+        return {
+          x: r.right - containerRect.left - r.width * 0.1,
+          y: r.bottom - containerRect.top - r.height * 0.2,
+        };
+      }
+      if (edge === 'bottom-left') {
+        return {
+          x: r.left - containerRect.left + r.width * 0.1,
+          y: r.bottom - containerRect.top - r.height * 0.2,
+        };
+      }
+      if (edge === 'top-right') {
+        return {
+          x: r.right - containerRect.left - r.width * 0.1,
+          y: r.top - containerRect.top + r.height * 0.2,
+        };
+      }
+      // top-left
+      return {
+        x: r.left - containerRect.left + r.width * 0.1,
+        y: r.top - containerRect.top + r.height * 0.2,
+      };
+    };
+
+    const p1 = getCardPoint(card1Ref, 'bottom-right');
+    const p2 = getCardPoint(card2Ref, 'bottom-left');
+    const p3 = getCardPoint(card3Ref, 'top-right');
+    const p4 = getCardPoint(card4Ref, 'top-left');
+
+    // Cubic Bezier Curve paths with exact pixel coordinates
+    const path1 = `M ${p1.x.toFixed(1)} ${p1.y.toFixed(1)} C ${(p1.x + (heroTL.x - p1.x) * 0.5).toFixed(1)} ${p1.y.toFixed(1)}, ${(p1.x + (heroTL.x - p1.x) * 0.5).toFixed(1)} ${heroTL.y.toFixed(1)}, ${heroTL.x.toFixed(1)} ${heroTL.y.toFixed(1)}`;
+    const path2 = `M ${p2.x.toFixed(1)} ${p2.y.toFixed(1)} C ${(p2.x + (heroTR.x - p2.x) * 0.5).toFixed(1)} ${p2.y.toFixed(1)}, ${(p2.x + (heroTR.x - p2.x) * 0.5).toFixed(1)} ${heroTR.y.toFixed(1)}, ${heroTR.x.toFixed(1)} ${heroTR.y.toFixed(1)}`;
+    const path3 = `M ${p3.x.toFixed(1)} ${p3.y.toFixed(1)} C ${(p3.x + (heroBL.x - p3.x) * 0.5).toFixed(1)} ${p3.y.toFixed(1)}, ${(p3.x + (heroBL.x - p3.x) * 0.5).toFixed(1)} ${heroBL.y.toFixed(1)}, ${heroBL.x.toFixed(1)} ${heroBL.y.toFixed(1)}`;
+    const path4 = `M ${p4.x.toFixed(1)} ${p4.y.toFixed(1)} C ${(p4.x + (heroBR.x - p4.x) * 0.5).toFixed(1)} ${p4.y.toFixed(1)}, ${(p4.x + (heroBR.x - p4.x) * 0.5).toFixed(1)} ${heroBR.y.toFixed(1)}, ${heroBR.x.toFixed(1)} ${heroBR.y.toFixed(1)}`;
+
+    setLines([
+      { x1: p1.x, y1: p1.y, x2: heroTL.x, y2: heroTL.y, pathD: path1 },
+      { x1: p2.x, y1: p2.y, x2: heroTR.x, y2: heroTR.y, pathD: path2 },
+      { x1: p3.x, y1: p3.y, x2: heroBL.x, y2: heroBL.y, pathD: path3 },
+      { x1: p4.x, y1: p4.y, x2: heroBR.x, y2: heroBR.y, pathD: path4 },
+    ]);
+  };
+
+  useLayoutEffect(() => {
+    updateLines();
+    window.addEventListener('resize', updateLines);
+
+    const observer = new ResizeObserver(() => updateLines());
+    if (containerRef.current) observer.observe(containerRef.current);
+
+    return () => {
+      window.removeEventListener('resize', updateLines);
+      observer.disconnect();
+    };
+  }, []);
+
+  // Update line endpoints while mouse position or hover state shifts cards
+  useEffect(() => {
+    let animId: number;
+    const loop = () => {
+      updateLines();
+    };
+    animId = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(animId);
+  }, [mousePos, hoveredCard, progress]);
+
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const { clientX, clientY } = e;
     const { innerWidth, innerHeight } = window;
@@ -42,7 +163,7 @@ export const LandingPage: React.FC = () => {
 
   const handleEnter = () => {
     if (user) {
-      navigate('/datasets');
+      navigate('/dashboard');
     } else {
       navigate('/login');
     }
@@ -57,9 +178,27 @@ export const LandingPage: React.FC = () => {
         backgroundSize: '32px 32px',
       }}
     >
+      {/* Custom Keyframe Animations for Dotted Neural Flow */}
+      <style>{`
+        @keyframes connectionFlow {
+          to {
+            stroke-dashoffset: -24;
+          }
+        }
+        @keyframes connectionPulse {
+          0%, 100% { opacity: 0.65; }
+          50% { opacity: 0.9; }
+        }
+        .animate-connection-dotted {
+          stroke-dasharray: 4 10;
+          stroke-linecap: round;
+          animation: connectionFlow 3s linear infinite, connectionPulse 4s ease-in-out infinite;
+        }
+      `}</style>
+
       {/* Central Gold Ambient Glow */}
       <div
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full pointer-events-none transition-all duration-1000"
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full pointer-events-none transition-all duration-1000 z-0"
         style={{
           boxShadow: '0 0 120px 60px rgba(167, 139, 113, 0.18)',
           background: 'radial-gradient(circle, rgba(167,139,113,0.12) 0%, rgba(10,10,10,0) 70%)',
@@ -85,99 +224,136 @@ export const LandingPage: React.FC = () => {
       </header>
 
       {/* MAIN CINEMATIC HERO COMPOSITION */}
-      <main className="relative z-20 flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 flex flex-col justify-center items-center py-8">
+      <main className="relative z-20 flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 flex flex-col justify-center items-center py-6">
         
-        {/* SVG Neural Connection Lines Overlay */}
-        <svg
-          className="absolute inset-0 w-full h-full pointer-events-none z-10"
-          xmlns="http://www.w3.org/2000/svg"
+        {/* EXACT PLAYFAIR DISPLAY ITALIC TITLE (TOP OF HERO COMPOSITION) */}
+        <div className="text-center pb-4 sm:pb-6 z-20">
+          <h1 className="font-playfair italic font-normal text-5xl sm:text-7xl md:text-8xl text-white tracking-tight leading-none drop-shadow-2xl">
+            DataForge
+          </h1>
+        </div>
+
+        {/* HERO CARD COMPOSITION CONTAINER */}
+        <div
+          ref={containerRef}
+          className="relative w-full max-w-5xl flex items-center justify-center min-h-[440px] md:min-h-[520px]"
         >
-          <defs>
-            <linearGradient id="goldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#A78B71" stopOpacity="0.6" />
-              <stop offset="50%" stopColor="#E8D5B7" stopOpacity="0.9" />
-              <stop offset="100%" stopColor="#A78B71" stopOpacity="0.4" />
-            </linearGradient>
-          </defs>
+          {/* DEDICATED SVG CONNECTION LINES LAYER (z-10: Above background, below cards/hero) */}
+          <svg
+            className="absolute inset-0 w-full h-full pointer-events-none z-10 overflow-visible"
+            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
+          >
+            <defs>
+              <filter id="goldGlow" x="-20%" y="-20%" width="140%" height="140%">
+                <feDropShadow dx="0" dy="0" stdDeviation="3" floodColor="#c9b8a0" floodOpacity="0.45" />
+              </filter>
+              <filter id="goldGlowHover" x="-30%" y="-30%" width="160%" height="160%">
+                <feDropShadow dx="0" dy="0" stdDeviation="6" floodColor="#e8d5b7" floodOpacity="0.85" />
+              </filter>
+            </defs>
 
-          {/* Connection Lines from Satellites to Center */}
-          <path
-            d="M 18% 25% Q 35% 30% 50% 45%"
-            fill="none"
-            stroke="url(#goldGradient)"
-            strokeWidth="2"
-            strokeDasharray="6 6"
-            className="animate-pulse"
-            style={{ opacity: Math.min(1, progress / 30) }}
-          />
-          <path
-            d="M 82% 25% Q 65% 30% 50% 45%"
-            fill="none"
-            stroke="url(#goldGradient)"
-            strokeWidth="2"
-            strokeDasharray="6 6"
-            className="animate-pulse"
-            style={{ opacity: Math.min(1, progress / 50) }}
-          />
-          <path
-            d="M 18% 70% Q 35% 65% 50% 55%"
-            fill="none"
-            stroke="url(#goldGradient)"
-            strokeWidth="2"
-            strokeDasharray="6 6"
-            className="animate-pulse"
-            style={{ opacity: Math.min(1, progress / 70) }}
-          />
-          <path
-            d="M 82% 70% Q 65% 65% 50% 55%"
-            fill="none"
-            stroke="url(#goldGradient)"
-            strokeWidth="2"
-            strokeDasharray="6 6"
-            className="animate-pulse"
-            style={{ opacity: Math.min(1, progress / 90) }}
-          />
-        </svg>
+            {/* Render dynamically calculated cubic Bezier dotted connection lines */}
+            {lines.map((line, idx) => {
+              const cardNum = idx + 1;
+              const isHovered = hoveredCard === cardNum;
+              if (!line.pathD) return null;
+              return (
+                <g key={cardNum}>
+                  {/* Outer Glow Path */}
+                  <path
+                    d={line.pathD}
+                    fill="none"
+                    stroke={isHovered ? "#E8D5B7" : "#c9b8a0"}
+                    strokeWidth={isHovered ? "4" : "3"}
+                    strokeLinecap="round"
+                    filter={isHovered ? "url(#goldGlowHover)" : "url(#goldGlow)"}
+                    style={{ opacity: isHovered ? 0.6 : 0.3 }}
+                  />
 
-        {/* HERO CARD COMPOSITION GRID */}
-        <div className="relative w-full max-w-5xl flex items-center justify-center min-h-[440px] md:min-h-[520px]">
+                  {/* Primary Visible Dotted Gold Line */}
+                  <path
+                    d={line.pathD}
+                    fill="none"
+                    stroke={isHovered ? "#E8D5B7" : "#c9b8a0"}
+                    strokeWidth={isHovered ? "3" : "2"}
+                    strokeLinecap="round"
+                    className="animate-connection-dotted"
+                    style={{ opacity: isHovered ? 1.0 : 0.75 }}
+                  />
 
-          {/* SATELLITE 1: TOP LEFT (Sample table data ERR1883195) */}
+                  {/* Dynamic Gold Connection Nodes at Ends */}
+                  <circle cx={line.x1} cy={line.y1} r={isHovered ? "4.5" : "3.5"} fill="#E8D5B7" opacity={isHovered ? 1 : 0.85} />
+                  <circle cx={line.x2} cy={line.y2} r={isHovered ? "4.5" : "3.5"} fill="#a78b71" opacity={isHovered ? 1 : 0.85} />
+                </g>
+              );
+            })}
+          </svg>
+
+          {/* SATELLITE 1: TOP LEFT (card1.png) - z-30 unhovered, z-50 hovered */}
           <div
-            className="hidden md:block absolute top-4 left-0 w-64 lg:w-72 z-20 transition-all duration-700 ease-out"
+            ref={card1Ref}
+            onMouseEnter={() => setHoveredCard(1)}
+            onMouseLeave={() => setHoveredCard(null)}
+            className={`hidden md:block absolute top-4 left-0 w-64 lg:w-72 cursor-pointer ${
+              hoveredCard === 1 ? 'z-50' : 'z-20'
+            }`}
             style={{
-              transform: `translate3d(${mousePos.x * -0.6}px, ${mousePos.y * -0.6}px, 0) scale(${progress >= 20 ? 1 : 0.9})`,
+              transform: hoveredCard === 1
+                ? `translate3d(${mousePos.x * -0.6 + 36}px, ${mousePos.y * -0.6 + 32}px, 0) scale(1.05)`
+                : `translate3d(${mousePos.x * -0.6}px, ${mousePos.y * -0.6}px, 0) scale(${progress >= 20 ? 1 : 0.9})`,
               opacity: Math.min(1, progress / 25),
+              transition: 'transform 0.6s cubic-bezier(0.4, 0, 0.2, 1), filter 0.6s ease, box-shadow 0.6s ease',
             }}
           >
-            <div className="bg-white/[0.03] border border-white/10 hover:border-[#A78B71]/50 rounded-2xl p-2 shadow-2xl backdrop-blur-md transition-all group">
+            <div className={`rounded-2xl p-2 backdrop-blur-md transition-all duration-500 border ${
+              hoveredCard === 1
+                ? 'bg-white/[0.08] border-[#E8D5B7] shadow-[0_0_35px_rgba(232,213,183,0.4),0_20px_40px_rgba(0,0,0,0.8)]'
+                : 'bg-white/[0.03] border-white/10 hover:border-[#A78B71]/50 shadow-2xl'
+            }`}>
               <img
                 src="/landing/card1.png"
                 alt="Microbiome Sample Data Table"
-                className="w-full h-auto rounded-xl border border-white/5 opacity-90 group-hover:opacity-100 transition-opacity"
+                className={`w-full h-auto rounded-xl border border-white/5 transition-all duration-500 ${
+                  hoveredCard === 1 ? 'opacity-100 filter-none scale-[1.01]' : 'opacity-90'
+                }`}
               />
             </div>
           </div>
 
-          {/* SATELLITE 2: TOP RIGHT (Vehicle count traffic dataset) */}
+          {/* SATELLITE 2: TOP RIGHT (card2.png) - z-30 unhovered, z-50 hovered */}
           <div
-            className="hidden md:block absolute top-4 right-0 w-64 lg:w-72 z-20 transition-all duration-700 ease-out"
+            ref={card2Ref}
+            onMouseEnter={() => setHoveredCard(2)}
+            onMouseLeave={() => setHoveredCard(null)}
+            className={`hidden md:block absolute top-4 right-0 w-64 lg:w-72 cursor-pointer ${
+              hoveredCard === 2 ? 'z-50' : 'z-20'
+            }`}
             style={{
-              transform: `translate3d(${mousePos.x * 0.6}px, ${mousePos.y * -0.6}px, 0) scale(${progress >= 40 ? 1 : 0.9})`,
+              transform: hoveredCard === 2
+                ? `translate3d(${mousePos.x * 0.6 - 36}px, ${mousePos.y * -0.6 + 32}px, 0) scale(1.05)`
+                : `translate3d(${mousePos.x * 0.6}px, ${mousePos.y * -0.6}px, 0) scale(${progress >= 40 ? 1 : 0.9})`,
               opacity: Math.min(1, progress / 45),
+              transition: 'transform 0.6s cubic-bezier(0.4, 0, 0.2, 1), filter 0.6s ease, box-shadow 0.6s ease',
             }}
           >
-            <div className="bg-white/[0.03] border border-white/10 hover:border-[#A78B71]/50 rounded-2xl p-2 shadow-2xl backdrop-blur-md transition-all group">
+            <div className={`rounded-2xl p-2 backdrop-blur-md transition-all duration-500 border ${
+              hoveredCard === 2
+                ? 'bg-white/[0.08] border-[#E8D5B7] shadow-[0_0_35px_rgba(232,213,183,0.4),0_20px_40px_rgba(0,0,0,0.8)]'
+                : 'bg-white/[0.03] border-white/10 hover:border-[#A78B71]/50 shadow-2xl'
+            }`}>
               <img
                 src="/landing/card2.png"
                 alt="Vehicle Telemetry Data Table"
-                className="w-full h-auto rounded-xl border border-white/5 opacity-90 group-hover:opacity-100 transition-opacity"
+                className={`w-full h-auto rounded-xl border border-white/5 transition-all duration-500 ${
+                  hoveredCard === 2 ? 'opacity-100 filter-none scale-[1.01]' : 'opacity-90'
+                }`}
               />
             </div>
           </div>
 
-          {/* CENTRAL VISUAL ANCHOR (Platform Dark UI Mockup - hero-center.png) */}
+          {/* CENTRAL VISUAL ANCHOR (Platform Dark UI Mockup - hero-center.png) - z-20 */}
           <div
+            ref={heroRef}
             className="relative z-30 max-w-2xl w-full mx-auto transition-all duration-1000 ease-out transform hover:scale-[1.01]"
             style={{
               transform: `translate3d(${mousePos.x * 0.2}px, ${mousePos.y * 0.2}px, 0)`,
@@ -196,36 +372,64 @@ export const LandingPage: React.FC = () => {
             </div>
           </div>
 
-          {/* SATELLITE 3: BOTTOM LEFT (Cosmetics financial model) */}
+          {/* SATELLITE 3: BOTTOM LEFT (card3.png) - z-30 unhovered, z-50 hovered */}
           <div
-            className="hidden md:block absolute bottom-4 left-0 w-64 lg:w-72 z-20 transition-all duration-700 ease-out"
+            ref={card3Ref}
+            onMouseEnter={() => setHoveredCard(3)}
+            onMouseLeave={() => setHoveredCard(null)}
+            className={`hidden md:block absolute bottom-4 left-0 w-64 lg:w-72 cursor-pointer ${
+              hoveredCard === 3 ? 'z-50' : 'z-20'
+            }`}
             style={{
-              transform: `translate3d(${mousePos.x * -0.6}px, ${mousePos.y * 0.6}px, 0) scale(${progress >= 60 ? 1 : 0.9})`,
+              transform: hoveredCard === 3
+                ? `translate3d(${mousePos.x * -0.6 + 36}px, ${mousePos.y * 0.6 - 32}px, 0) scale(1.05)`
+                : `translate3d(${mousePos.x * -0.6}px, ${mousePos.y * 0.6}px, 0) scale(${progress >= 60 ? 1 : 0.9})`,
               opacity: Math.min(1, progress / 65),
+              transition: 'transform 0.6s cubic-bezier(0.4, 0, 0.2, 1), filter 0.6s ease, box-shadow 0.6s ease',
             }}
           >
-            <div className="bg-white/[0.03] border border-white/10 hover:border-[#A78B71]/50 rounded-2xl p-2 shadow-2xl backdrop-blur-md transition-all group">
+            <div className={`rounded-2xl p-2 backdrop-blur-md transition-all duration-500 border ${
+              hoveredCard === 3
+                ? 'bg-white/[0.08] border-[#E8D5B7] shadow-[0_0_35px_rgba(232,213,183,0.4),0_20px_40px_rgba(0,0,0,0.8)]'
+                : 'bg-white/[0.03] border-white/10 hover:border-[#A78B71]/50 shadow-2xl'
+            }`}>
               <img
                 src="/landing/card3.png"
                 alt="Cosmetics Financial Model Data"
-                className="w-full h-auto rounded-xl border border-white/5 opacity-90 group-hover:opacity-100 transition-opacity"
+                className={`w-full h-auto rounded-xl border border-white/5 transition-all duration-500 ${
+                  hoveredCard === 3 ? 'opacity-100 filter-none scale-[1.01]' : 'opacity-90'
+                }`}
               />
             </div>
           </div>
 
-          {/* SATELLITE 4: BOTTOM RIGHT (Excel sales commission formula table) */}
+          {/* SATELLITE 4: BOTTOM RIGHT (card4.png) - z-30 unhovered, z-50 hovered */}
           <div
-            className="hidden md:block absolute bottom-4 right-0 w-64 lg:w-72 z-20 transition-all duration-700 ease-out"
+            ref={card4Ref}
+            onMouseEnter={() => setHoveredCard(4)}
+            onMouseLeave={() => setHoveredCard(null)}
+            className={`hidden md:block absolute bottom-4 right-0 w-64 lg:w-72 cursor-pointer ${
+              hoveredCard === 4 ? 'z-50' : 'z-20'
+            }`}
             style={{
-              transform: `translate3d(${mousePos.x * 0.6}px, ${mousePos.y * 0.6}px, 0) scale(${progress >= 80 ? 1 : 0.9})`,
+              transform: hoveredCard === 4
+                ? `translate3d(${mousePos.x * 0.6 - 36}px, ${mousePos.y * 0.6 - 32}px, 0) scale(1.05)`
+                : `translate3d(${mousePos.x * 0.6}px, ${mousePos.y * 0.6}px, 0) scale(${progress >= 80 ? 1 : 0.9})`,
               opacity: Math.min(1, progress / 85),
+              transition: 'transform 0.6s cubic-bezier(0.4, 0, 0.2, 1), filter 0.6s ease, box-shadow 0.6s ease',
             }}
           >
-            <div className="bg-white/[0.03] border border-white/10 hover:border-[#A78B71]/50 rounded-2xl p-2 shadow-2xl backdrop-blur-md transition-all group">
+            <div className={`rounded-2xl p-2 backdrop-blur-md transition-all duration-500 border ${
+              hoveredCard === 4
+                ? 'bg-white/[0.08] border-[#E8D5B7] shadow-[0_0_35px_rgba(232,213,183,0.4),0_20px_40px_rgba(0,0,0,0.8)]'
+                : 'bg-white/[0.03] border-white/10 hover:border-[#A78B71]/50 shadow-2xl'
+            }`}>
               <img
                 src="/landing/card4.png"
                 alt="Sales Commission Formula Table"
-                className="w-full h-auto rounded-xl border border-white/5 opacity-90 group-hover:opacity-100 transition-opacity"
+                className={`w-full h-auto rounded-xl border border-white/5 transition-all duration-500 ${
+                  hoveredCard === 4 ? 'opacity-100 filter-none scale-[1.01]' : 'opacity-90'
+                }`}
               />
             </div>
           </div>
@@ -264,7 +468,7 @@ export const LandingPage: React.FC = () => {
           </div>
 
           {/* Progress Bar Container */}
-          <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden border border-white/5">
+          <div className="w-full h-1.5 bg-[#FFFFFF]/10 rounded-full overflow-hidden border border-white/5">
             <div
               className="h-full bg-gradient-to-r from-[#A78B71] via-[#C9B8A0] to-[#E8D5B7] transition-all duration-150 ease-out"
               style={{ width: `${progress}%` }}
@@ -272,12 +476,6 @@ export const LandingPage: React.FC = () => {
           </div>
         </div>
 
-        {/* EXACT PLAYFAIR DISPLAY ITALIC TITLE */}
-        <div className="text-center pt-2">
-          <h1 className="font-playfair italic font-normal text-5xl sm:text-7xl md:text-8xl text-white tracking-tight leading-none drop-shadow-2xl">
-            DataForge
-          </h1>
-        </div>
 
         {/* ACTION BUTTON ONCE LOADED */}
         {isLoaded && (
