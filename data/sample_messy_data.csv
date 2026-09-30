@@ -1,0 +1,11 @@
+customer_id,name,email,phone,age,city,signup_date
+CUST_001, John Doe ,john.doe@example.com,+1 (555) 019-2834,34, New York,2023-01-15
+CUST_002,Jane Smith,JANE.SMITH@EXAMPLE.COM,555-019-2835,28,London,01/16/2023
+CUST_003, Robert Johnson ,robert.j@domain.org,5550192836,,Chicago,17-Jan-2023
+CUST_004,Emily Davis,emily.davis@test.co.uk,+1 555 019 2837,42, New York ,2023-01-18
+CUST_002,Jane Smith,JANE.SMITH@EXAMPLE.COM,555-019-2835,28,London,01/16/2023
+CUST_005,Michael Brown ,michael.b@sample.net,  555-019-2838  ,31,,2023.01.19
+CUST_006, Sarah Wilson,sarah.w@example.com,+1-555-019-2839,25,Seattle,2023-01-20
+CUST_007,,invalid_email_format,555-019-2840,999,San Francisco,2023-01-21
+CUST_008,David Taylor,david.t@example.com,,39,Chicago,2023-01-22
+CUST_009,Lisa Anderson,LISA.A@DOMAIN.ORG,+1 (555) 019-2842,22,London,01/23/2023
