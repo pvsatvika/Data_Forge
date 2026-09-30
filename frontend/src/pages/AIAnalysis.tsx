@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams, useParams, Link } from 'react-router-dom';
 import { WorkflowStepper } from '../components/WorkflowStepper';
 import {
   BrainCircuit,
@@ -18,14 +18,22 @@ import { apiService } from '../services/api';
 import { SemanticAnalysisResponse } from '../types';
 
 export const AIAnalysis: React.FC = () => {
+  const { datasetId } = useParams<{ datasetId?: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
-  const datasetIdFromUrl = searchParams.get('id') || '';
+  const datasetIdFromUrl = datasetId || searchParams.get('id') || '';
 
   const [inputDatasetId, setInputDatasetId] = useState<string>(datasetIdFromUrl);
   const [activeDatasetId, setActiveDatasetId] = useState<string>(datasetIdFromUrl);
   const [analysis, setAnalysis] = useState<SemanticAnalysisResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (datasetIdFromUrl && datasetIdFromUrl !== activeDatasetId) {
+      setActiveDatasetId(datasetIdFromUrl);
+      setInputDatasetId(datasetIdFromUrl);
+    }
+  }, [datasetIdFromUrl]);
 
   // Attempt to load existing analysis on mount or URL change
   useEffect(() => {

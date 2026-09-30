@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams, useParams, Link } from 'react-router-dom';
 import { WorkflowStepper } from '../components/WorkflowStepper';
 import {
   BarChart3,
@@ -10,21 +10,31 @@ import {
   FileSpreadsheet,
   AlertTriangle,
   Search,
-  Tag
+  Tag,
+  Sparkles,
+  ArrowRight
 } from 'lucide-react';
 import { apiService } from '../services/api';
 import { DatasetProfile, ColumnProfile } from '../types';
 import { formatNumber } from '../utils/formatters';
 
 export const ProfilePage: React.FC = () => {
+  const { datasetId } = useParams<{ datasetId?: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
-  const datasetIdFromUrl = searchParams.get('id') || '';
+  const datasetIdFromUrl = datasetId || searchParams.get('id') || '';
 
   const [inputDatasetId, setInputDatasetId] = useState<string>(datasetIdFromUrl);
   const [activeDatasetId, setActiveDatasetId] = useState<string>(datasetIdFromUrl);
   const [profile, setProfile] = useState<DatasetProfile | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (datasetIdFromUrl && datasetIdFromUrl !== activeDatasetId) {
+      setActiveDatasetId(datasetIdFromUrl);
+      setInputDatasetId(datasetIdFromUrl);
+    }
+  }, [datasetIdFromUrl]);
 
   useEffect(() => {
     if (!activeDatasetId) return;
@@ -99,7 +109,18 @@ export const ProfilePage: React.FC = () => {
           <p className="text-xs text-slate-400">Statistical distribution, schema detection, and heuristic pattern recognition.</p>
         </div>
 
-        <form onSubmit={handleSearchSubmit} className="flex gap-2">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+          {profile && (
+            <Link
+              to={`/analysis?id=${profile.dataset_id}`}
+              className="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-lg text-xs flex items-center gap-2 shadow-lg shadow-sky-600/20 transition-all"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              Analyze with AI
+            </Link>
+          )}
+
+          <form onSubmit={handleSearchSubmit} className="flex gap-2">
           <div className="relative">
             <input
               type="text"
@@ -118,6 +139,7 @@ export const ProfilePage: React.FC = () => {
           </button>
         </form>
       </div>
+    </div>
 
       {loading && (
         <div className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-12 text-center">
@@ -260,6 +282,21 @@ export const ProfilePage: React.FC = () => {
                 </tbody>
               </table>
             </div>
+          </div>
+
+          {/* Bottom Action Card */}
+          <div className="p-4 bg-slate-800/80 border border-slate-700 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <span className="text-xs text-slate-400">
+              Deterministic profiling complete. Proceed to Groq AI Semantic Intelligence for constraint inference and cleaning recommendations.
+            </span>
+            <Link
+              to={`/analysis?id=${profile.dataset_id}`}
+              className="px-5 py-2.5 bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold rounded-lg flex items-center gap-2 transition-all shadow-lg shadow-sky-600/20 self-start sm:self-auto"
+            >
+              <Sparkles className="w-4 h-4" />
+              Analyze with AI
+              <ArrowRight className="w-4 h-4" />
+            </Link>
           </div>
         </div>
       )}

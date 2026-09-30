@@ -38,6 +38,11 @@ export const apiService = {
     return response.data;
   },
 
+  listDatasets: async (): Promise<Dataset[]> => {
+    const response = await apiClient.get<Dataset[]>('/datasets');
+    return response.data;
+  },
+
   getDataset: async (id: string): Promise<Dataset> => {
     const response = await apiClient.get<Dataset>(`/datasets/${id}`);
     return response.data;

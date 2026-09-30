@@ -28,11 +28,18 @@ export const App: React.FC = () => {
               <Route path="/" element={<Dashboard />} />
               <Route path="/datasets" element={<Datasets />} />
               <Route path="/profile" element={<ProfilePage />} />
+              <Route path="/profile/:datasetId" element={<ProfilePage />} />
               <Route path="/analysis" element={<AIAnalysis />} />
+              <Route path="/analysis/:datasetId" element={<AIAnalysis />} />
+              <Route path="/ai-analysis/:datasetId" element={<AIAnalysis />} />
               <Route path="/plan" element={<CleaningPlanPage />} />
+              <Route path="/plan/:datasetId" element={<CleaningPlanPage />} />
               <Route path="/preview" element={<PreviewPage />} />
+              <Route path="/preview/:datasetId" element={<PreviewPage />} />
               <Route path="/validation" element={<ValidationPage />} />
+              <Route path="/validation/:datasetId" element={<ValidationPage />} />
               <Route path="/history" element={<HistoryPage />} />
+              <Route path="/history/:datasetId" element={<HistoryPage />} />
             </Routes>
           </main>
         </div>

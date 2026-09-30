@@ -125,6 +125,14 @@ async def upload_dataset(
 
     return DatasetMetadata.model_validate(db_dataset)
 
+@router.get("/datasets", response_model=List[DatasetMetadata])
+async def list_datasets(
+    db: Session = Depends(get_db)
+):
+    """Retrieve all uploaded datasets ordered by upload timestamp descending."""
+    datasets = db.query(DatasetModel).order_by(DatasetModel.upload_timestamp.desc()).all()
+    return [DatasetMetadata.model_validate(ds) for ds in datasets]
+
 @router.get("/datasets/{dataset_id}", response_model=DatasetMetadata)
 async def get_dataset(
     dataset_id: str,
