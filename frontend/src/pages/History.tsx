@@ -29,6 +29,30 @@ export const HistoryPage: React.FC = () => {
   const [rollbackTarget, setRollbackTarget] = useState<VersionItem | null>(null);
   const [rollingBack, setRollingBack] = useState<boolean>(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [downloadingVersion, setDownloadingVersion] = useState<number | 'active' | null>(null);
+
+  const handleDownload = async (datasetId: string, versionNumber?: number) => {
+    const versionKey = versionNumber !== undefined ? versionNumber : 'active';
+    setDownloadingVersion(versionKey);
+    setError(null);
+
+    try {
+      const { blob, filename } = await apiService.downloadDataset(datasetId, versionNumber);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err: any) {
+      const msg = err?.response?.data?.detail || err?.message || 'Failed to download dataset file.';
+      setError(msg);
+    } finally {
+      setDownloadingVersion(null);
+    }
+  };
 
   const fetchHistory = () => {
     if (!activeDatasetId) return;
@@ -179,14 +203,18 @@ export const HistoryPage: React.FC = () => {
                 Dataset Version Chain ({history.versions.length} versions)
               </h3>
             </div>
-            <a
-              href={apiService.getDownloadUrl(history.dataset_id)}
-              download
-              className="px-4 py-2 bg-[#7E454B] hover:bg-[#6A393E] text-white font-mono text-xs font-bold rounded-lg flex items-center gap-2 transition-colors border border-[#7E454B]"
+            <button
+              onClick={() => handleDownload(history.dataset_id)}
+              disabled={downloadingVersion !== null}
+              className="px-4 py-2 bg-[#7E454B] hover:bg-[#6A393E] text-white font-mono text-xs font-bold rounded-lg flex items-center gap-2 transition-colors border border-[#7E454B] disabled:opacity-50"
             >
-              <Download className="w-4 h-4 text-white" />
+              {downloadingVersion === 'active' ? (
+                <Loader2 className="w-4 h-4 text-white animate-spin" />
+              ) : (
+                <Download className="w-4 h-4 text-white" />
+              )}
               [ DOWNLOAD CURRENT ACTIVE VERSION ]
-            </a>
+            </button>
           </div>
 
           {/* Versions Table */}
@@ -249,14 +277,18 @@ export const HistoryPage: React.FC = () => {
                       </td>
                       <td className="py-3 px-4 text-right">
                         <div className="flex items-center justify-end gap-2">
-                          <a
-                            href={apiService.getDownloadUrl(history.dataset_id, ver.version_number)}
-                            download
-                            className="px-2.5 py-1 bg-white dark:bg-[#19181C] border border-[#E5E0D8] dark:border-[#29262C] text-[#2B2827] dark:text-[#F0EDEA] text-[11px] font-semibold rounded-lg flex items-center gap-1 transition-colors hover:bg-[#F6F4F0] dark:hover:bg-[#222026]"
+                          <button
+                            onClick={() => handleDownload(history.dataset_id, ver.version_number)}
+                            disabled={downloadingVersion !== null}
+                            className="px-2.5 py-1 bg-white dark:bg-[#19181C] border border-[#E5E0D8] dark:border-[#29262C] text-[#2B2827] dark:text-[#F0EDEA] text-[11px] font-semibold rounded-lg flex items-center gap-1 transition-colors hover:bg-[#F6F4F0] dark:hover:bg-[#222026] disabled:opacity-50"
                           >
-                            <Download className="w-3 h-3 text-[#7E454B] dark:text-[#9E5A61]" />
+                            {downloadingVersion === ver.version_number ? (
+                              <Loader2 className="w-3 h-3 text-[#7E454B] dark:text-[#9E5A61] animate-spin" />
+                            ) : (
+                              <Download className="w-3 h-3 text-[#7E454B] dark:text-[#9E5A61]" />
+                            )}
                             [ DOWNLOAD ]
-                          </a>
+                          </button>
 
                           {!ver.is_active && (
                             <button

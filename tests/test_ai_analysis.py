@@ -211,3 +211,37 @@ async def test_groq_timeout_handling(client):
             resp = client.post(f"/api/v1/analyze/{dataset_id}")
             assert resp.status_code == 502
             assert "timed out" in resp.json()["detail"]
+
+@pytest.mark.asyncio
+async def test_groq_unauthorized_key_handling(client):
+    """Verify 401 invalid API key results in 502 Bad Gateway without exposing secret keys."""
+    csv_bytes = b"id,val\n1,2\n"
+    upload_resp = client.post("/api/v1/upload", files={"file": ("t.csv", csv_bytes, "text/csv")})
+    dataset_id = upload_resp.json()["id"]
+
+    with patch("app.api.routes.dataset.GroqClient.is_configured", return_value=True):
+        with patch("app.api.routes.dataset.GroqClient.analyze_profile", side_effect=GroqClientError("Invalid or unauthorized Groq API key.")):
+            resp = client.post(f"/api/v1/analyze/{dataset_id}")
+            assert resp.status_code == 502
+            assert "Invalid or unauthorized Groq API key" in resp.json()["detail"]
+            # Ensure no secret strings are exposed
+            assert "gsk_" not in resp.text
+
+@pytest.mark.asyncio
+async def test_groq_rate_limit_handling(client):
+    """Verify 429 rate limit results in 502 Bad Gateway with safe error message."""
+    csv_bytes = b"id,val\n1,2\n"
+    upload_resp = client.post("/api/v1/upload", files={"file": ("t.csv", csv_bytes, "text/csv")})
+    dataset_id = upload_resp.json()["id"]
+
+    with patch("app.api.routes.dataset.GroqClient.is_configured", return_value=True):
+        with patch("app.api.routes.dataset.GroqClient.analyze_profile", side_effect=GroqClientError("Groq API rate limit exceeded. Please retry shortly.")):
+            resp = client.post(f"/api/v1/analyze/{dataset_id}")
+            assert resp.status_code == 502
+            assert "rate limit exceeded" in resp.json()["detail"]
+
+def test_groq_model_configuration_is_supported():
+    """Verify configured Groq model is supported and non-empty."""
+    client = GroqClient()
+    assert client.model == "llama-3.3-70b-versatile"
+

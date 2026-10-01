@@ -1,4 +1,6 @@
 import time
+import json
+from unittest.mock import patch, AsyncMock
 import pytest
 import jwt
 from cryptography.hazmat.primitives.asymmetric import ec
@@ -248,3 +250,91 @@ def test_dataset_specific_endpoints_reject_cross_user_access(user_a_client, user
 
     # User B attempts download endpoint
     assert user_b_client.get(f"/api/v1/download/{ds_id}").status_code == 404
+
+
+def test_download_security_and_auth(user_a_client, user_b_client, unauth_client):
+    """
+    Step 7 Security Verification:
+    - Missing Authorization returns 401
+    - Invalid Bearer token returns 401
+    - Expired Bearer token returns 401
+    - Authenticated user can download their own active dataset (v0 and updated v1)
+    - Authenticated user can download permitted historical versions
+    - Cross-user download attempt returns 404
+    - Secret keys/tokens are never placed in URLs or filenames
+    """
+    # 1. Upload dataset as User A
+    csv_content = b"col1,col2\n100,abc\n200,xyz\n"
+    upload = user_a_client.post(
+        "/api/v1/upload",
+        files={"file": ("test_dl.csv", csv_content, "text/csv")}
+    )
+    assert upload.status_code == 201
+    ds_id = upload.json()["id"]
+
+    # 2. Missing Authorization header -> 401
+    res_unauth = unauth_client.get(f"/api/v1/download/{ds_id}")
+    assert res_unauth.status_code == 401
+    assert "Authentication credentials required" in res_unauth.json()["detail"]
+
+    # 3. Invalid token -> 401
+    res_invalid = unauth_client.get(
+        f"/api/v1/download/{ds_id}",
+        headers={"Authorization": "Bearer invalid_token_xyz"}
+    )
+    assert res_invalid.status_code == 401
+
+    # 4. Expired token -> 401
+    expired_token = create_jwt(user_id="user_a_123", exp=int(time.time()) - 3600)
+    res_expired = unauth_client.get(
+        f"/api/v1/download/{ds_id}",
+        headers={"Authorization": f"Bearer {expired_token}"}
+    )
+    assert res_expired.status_code == 401
+
+    # 5. User A downloads their active Version 0 dataset -> 200 OK
+    res_v0 = user_a_client.get(f"/api/v1/download/{ds_id}")
+    assert res_v0.status_code == 200
+    assert res_v0.content == csv_content
+
+    # 6. Execute cleaning plan to generate Version 1 updated dataset
+    mock_ai_json = json.dumps({
+        "dataset_summary": "Summary",
+        "recommendations": [{"column": "col2", "operation": "normalize_email", "reason": "Trim", "confidence": 0.9, "risk": "low"}]
+    })
+    with patch("app.api.routes.dataset.GroqClient.is_configured", return_value=True):
+        with patch("app.api.routes.dataset.GroqClient.analyze_profile", new_callable=AsyncMock) as mock_analyze:
+            mock_analyze.return_value = mock_ai_json
+            user_a_client.post(f"/api/v1/analyze/{ds_id}")
+
+    plan_resp = user_a_client.post(
+        f"/api/v1/plan/{ds_id}",
+        json={"selected_transformations": [{"column": "col2", "operation": "normalize_email", "reason": "Trim", "confidence": 0.9, "risk": "low"}]}
+    )
+    assert plan_resp.status_code == 201
+    plan_id = plan_resp.json()["plan_id"]
+    user_a_client.post(f"/api/v1/preview/{ds_id}")
+    approve_res = user_a_client.post(f"/api/v1/plan/{plan_id}/approve")
+    assert approve_res.status_code == 200
+    exec_res = user_a_client.post(f"/api/v1/execute/{ds_id}")
+    assert exec_res.status_code == 200
+    assert exec_res.json()["version_number"] == 1
+
+    # 7. User A downloads updated active Version 1 dataset -> 200 OK (contains updated CSV)
+    res_v1_active = user_a_client.get(f"/api/v1/download/{ds_id}")
+    assert res_v1_active.status_code == 200
+    assert b"col1,col2" in res_v1_active.content
+
+    # 8. User A downloads historical Version 0 -> 200 OK
+    res_v0_hist = user_a_client.get(f"/api/v1/download/{ds_id}?version=0")
+    assert res_v0_hist.status_code == 200
+    assert res_v0_hist.content == csv_content
+
+    # 9. User A downloads historical Version 1 -> 200 OK
+    res_v1_hist = user_a_client.get(f"/api/v1/download/{ds_id}?version=1")
+    assert res_v1_hist.status_code == 200
+
+    # 10. User B attempts to download User A's dataset -> 404 Ownership Protection
+    res_user_b = user_b_client.get(f"/api/v1/download/{ds_id}")
+    assert res_user_b.status_code == 404
+

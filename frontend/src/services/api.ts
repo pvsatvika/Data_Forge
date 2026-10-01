@@ -134,6 +134,39 @@ export const apiService = {
     return response.data;
   },
 
+  downloadDataset: async (datasetId: string, version?: number): Promise<{ blob: Blob; filename: string }> => {
+    const query = version !== undefined ? `?version=${version}` : '';
+    try {
+      const response = await apiClient.get(`/download/${datasetId}${query}`, {
+        responseType: 'blob',
+      });
+
+      let filename = `data_forge_${datasetId}${version !== undefined ? `_v${version}` : ''}.csv`;
+      const contentDisposition = response.headers['content-disposition'];
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename\*?=['"]?(?:UTF-8'')?([^;'"\r\n]+)['"]?/i);
+        if (filenameMatch && filenameMatch[1]) {
+          filename = decodeURIComponent(filenameMatch[1].replace(/['"]/g, ''));
+        }
+      }
+
+      return { blob: response.data, filename };
+    } catch (err: any) {
+      if (err.response?.data instanceof Blob) {
+        try {
+          const text = await err.response.data.text();
+          const json = JSON.parse(text);
+          if (json.detail) {
+            err.response.data = json;
+          }
+        } catch {
+          // Ignore JSON parse error if body is not valid JSON text
+        }
+      }
+      throw err;
+    }
+  },
+
   getDownloadUrl: (datasetId: string, version?: number): string => {
     const query = version !== undefined ? `?version=${version}` : '';
     return `${API_BASE_URL}/download/${datasetId}${query}`;
