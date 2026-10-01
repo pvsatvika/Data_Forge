@@ -1,4 +1,5 @@
 import os
+import json
 from pathlib import Path
 from typing import List
 from pydantic import Field
@@ -6,6 +7,28 @@ try:
     from pydantic_settings import BaseSettings
 except ImportError:
     from pydantic import BaseModel as BaseSettings  # Fallback type definition if needed
+
+def parse_cors_origins() -> List[str]:
+    raw = os.getenv("CORS_ORIGINS", "")
+    default_origins = [
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:5173",
+        "https://data-forge-phi-six.vercel.app"
+    ]
+    if not raw:
+        return default_origins
+
+    if raw.startswith("["):
+        try:
+            parsed = json.loads(raw)
+            if isinstance(parsed, list):
+                return parsed
+        except Exception:
+            pass
+
+    items = [item.strip() for item in raw.split(",") if item.strip()]
+    return items if items else default_origins
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = Field(default="Data Forge API")
@@ -40,9 +63,7 @@ class Settings(BaseSettings):
     ALLOWED_EXTENSIONS: set = Field(default_factory=lambda: {".csv", ".xlsx"})
 
     # CORS
-    CORS_ORIGINS: List[str] = Field(
-        default_factory=lambda: ["http://localhost:5173", "http://localhost:3000", "http://127.0.0.1:5173"]
-    )
+    CORS_ORIGINS: List[str] = Field(default_factory=parse_cors_origins)
 
     class Config:
         env_file = ".env"

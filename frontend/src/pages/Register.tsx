@@ -49,6 +49,9 @@ export const RegisterPage: React.FC = () => {
       const { error: authError } = await supabase.auth.signUp({
         email: email.trim(),
         password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/login`,
+        },
       });
 
       if (authError) {
@@ -56,6 +59,7 @@ export const RegisterPage: React.FC = () => {
         setLoading(false);
         return;
       }
+
 
       setLoading(false);
       setRegisteredSuccess(true);
