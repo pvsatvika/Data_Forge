@@ -17,5 +17,3 @@ python-dotenv>=1.0.1
 pyjwt[crypto]>=2.8.0
 cryptography>=41.0.0
 psycopg2-binary>=2.9.9
-
-
