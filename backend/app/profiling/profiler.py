@@ -1,7 +1,8 @@
+import io
 import re
 import math
 from pathlib import Path
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, List, Any, Optional, Tuple, Union
 import pandas as pd
 import numpy as np
 
@@ -13,30 +14,43 @@ DATE_NAME_REGEX = re.compile(r'(date|time|created|updated|dob|signup|timestamp)'
 ID_NAME_REGEX = re.compile(r'(id|uuid|key|pk|code|guid)', re.IGNORECASE)
 BOOLEAN_VALUES = {'true', 'false', 'yes', 'no', '0', '1', 't', 'f', 'y', 'n'}
 
-def load_dataset_dataframe(file_path: str, file_type: str) -> pd.DataFrame:
+def load_dataset_dataframe(file_input: Union[str, Path, bytes, io.BytesIO], file_type: str) -> pd.DataFrame:
     """
-    Safely load a dataset into a Pandas DataFrame.
-    Prevents execution of spreadsheet formulas by reading pre-calculated values (data_only=True).
+    Safely load a dataset into a Pandas DataFrame from a file path, bytes, or BytesIO buffer.
+    Supports CSV, XLSX, and Parquet formats.
     """
-    path = Path(file_path)
-    if not path.exists():
-        raise FileNotFoundError(f"Dataset file not found at path: {file_path}")
-
     ext = file_type.lower()
+    if not ext.startswith("."):
+        ext = f".{ext}"
+
+    if isinstance(file_input, bytes):
+        buffer: Union[io.BytesIO, str, Path] = io.BytesIO(file_input)
+    elif isinstance(file_input, io.BytesIO):
+        buffer = file_input
+    elif isinstance(file_input, (str, Path)):
+        path = Path(file_input)
+        if not path.exists():
+            raise FileNotFoundError(f"Dataset file not found at path: {file_input}")
+        buffer = str(path)
+    else:
+        buffer = io.BytesIO(file_input)
+
     if ext == ".csv":
-        # Read CSV cleanly
         try:
-            df = pd.read_csv(file_path, on_bad_lines='skip', low_memory=False)
+            df = pd.read_csv(buffer, on_bad_lines='skip', low_memory=False)
         except Exception:
-            # Fallback for encoding or delimiter issues
-            df = pd.read_csv(file_path, encoding='latin1', on_bad_lines='skip', low_memory=False)
+            if hasattr(buffer, "seek"):
+                buffer.seek(0)
+            df = pd.read_csv(buffer, encoding='latin1', on_bad_lines='skip', low_memory=False)
     elif ext == ".xlsx":
-        # Read XLSX safely without evaluating macros or dynamic code
-        df = pd.read_excel(file_path, engine='openpyxl')
+        df = pd.read_excel(buffer, engine='openpyxl')
+    elif ext == ".parquet":
+        df = pd.read_parquet(buffer)
     else:
         raise ValueError(f"Unsupported file format: {file_type}")
 
     return df
+
 
 def clean_json_value(val: Any) -> Any:
     """Ensure value is JSON serializable and safe from NaN/Infinity."""

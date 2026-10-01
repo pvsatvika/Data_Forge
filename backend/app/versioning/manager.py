@@ -1,15 +1,17 @@
+import io
 import hashlib
 import json
 import uuid
 from pathlib import Path
 from datetime import datetime
-from typing import Tuple, List, Optional
+from typing import Tuple, List, Optional, Union
 import pandas as pd
 from sqlalchemy.orm import Session
 
 from app.config.settings import settings
 from app.db.models import DatasetModel, VersionModel, ChangeLogModel, RollbackEventModel
 from app.models.schemas import CellDiffRecord
+from app.storage.service import storage_service, StorageServiceError
 
 def get_dataset_versions_dir(dataset_id: str) -> Path:
     """Get path to versions storage directory for dataset."""
@@ -17,13 +19,21 @@ def get_dataset_versions_dir(dataset_id: str) -> Path:
     versions_dir.mkdir(parents=True, exist_ok=True)
     return versions_dir
 
-def calculate_file_sha256(file_path: Path) -> str:
-    """Calculate SHA-256 hash of a file on disk."""
-    hasher = hashlib.sha256()
-    with open(file_path, "rb") as f:
-        while chunk := f.read(8192):
-            hasher.update(chunk)
-    return hasher.hexdigest()
+def calculate_file_sha256(file_path: Union[str, Path]) -> str:
+    """Calculate SHA-256 hash of a file on disk or in storage."""
+    path_str = str(file_path)
+    if Path(path_str).exists():
+        hasher = hashlib.sha256()
+        with open(path_str, "rb") as f:
+            while chunk := f.read(8192):
+                hasher.update(chunk)
+        return hasher.hexdigest()
+    else:
+        try:
+            data = storage_service.download_bytes_sync(path_str)
+            return hashlib.sha256(data).hexdigest()
+        except Exception:
+            return ""
 
 def prepare_dataframe_for_parquet(df: pd.DataFrame) -> pd.DataFrame:
     """
@@ -66,18 +76,22 @@ def ensure_version_zero(db: Session, dataset: DatasetModel, df_orig: pd.DataFram
     if v0_record:
         return v0_record
 
-    versions_dir = get_dataset_versions_dir(dataset.id)
-    v0_path = versions_dir / "v0.parquet"
+    object_path = storage_service.get_version_object_path(dataset.id, 0)
 
     # Safely prepare dataframe copy for Parquet serialization
     df_v0 = prepare_dataframe_for_parquet(df_orig)
 
     try:
-        df_v0.to_parquet(v0_path, index=False)
-        sha256_hash = calculate_file_sha256(v0_path)
+        parquet_buffer = io.BytesIO()
+        df_v0.to_parquet(parquet_buffer, index=False)
+        parquet_bytes = parquet_buffer.getvalue()
+        sha256_hash = hashlib.sha256(parquet_bytes).hexdigest()
+        stored_path = storage_service.upload_bytes_sync(
+            object_path=object_path,
+            data=parquet_bytes,
+            content_type="application/x-parquet"
+        )
     except Exception as e:
-        if v0_path.exists():
-            v0_path.unlink()
         raise ValueError(f"Failed to write Version 0 Parquet file: {str(e)}")
 
     v0 = VersionModel(
@@ -85,7 +99,7 @@ def ensure_version_zero(db: Session, dataset: DatasetModel, df_orig: pd.DataFram
         dataset_id=dataset.id,
         version_number=0,
         parent_version_id=None,
-        file_path=str(v0_path),
+        file_path=stored_path,
         sha256=sha256_hash,
         row_count=len(df_orig),
         column_count=len(df_orig.columns),
@@ -100,8 +114,7 @@ def ensure_version_zero(db: Session, dataset: DatasetModel, df_orig: pd.DataFram
         db.refresh(v0)
     except Exception as e:
         db.rollback()
-        if v0_path.exists():
-            v0_path.unlink()
+        storage_service.delete_object_sync(stored_path)
         raise ValueError(f"Database error committing Version 0 record: {str(e)}")
 
     return v0
@@ -118,18 +131,22 @@ def commit_new_version(
     Updates DatasetModel.current_version and records ChangeLog entries.
     """
     new_version_num = dataset.current_version + 1
-    versions_dir = get_dataset_versions_dir(dataset.id)
-    version_file_path = versions_dir / f"v{new_version_num}.parquet"
+    object_path = storage_service.get_version_object_path(dataset.id, new_version_num)
 
     # Safely prepare dataframe copy for Parquet serialization
     df_to_save = prepare_dataframe_for_parquet(df_cleaned)
 
     try:
-        df_to_save.to_parquet(version_file_path, index=False)
-        sha256_hash = calculate_file_sha256(version_file_path)
+        parquet_buffer = io.BytesIO()
+        df_to_save.to_parquet(parquet_buffer, index=False)
+        parquet_bytes = parquet_buffer.getvalue()
+        sha256_hash = hashlib.sha256(parquet_bytes).hexdigest()
+        stored_path = storage_service.upload_bytes_sync(
+            object_path=object_path,
+            data=parquet_bytes,
+            content_type="application/x-parquet"
+        )
     except Exception as e:
-        if version_file_path.exists():
-            version_file_path.unlink()
         raise ValueError(f"Failed to write Version {new_version_num} Parquet file: {str(e)}")
 
     # Find parent version record
@@ -144,7 +161,7 @@ def commit_new_version(
         dataset_id=dataset.id,
         version_number=new_version_num,
         parent_version_id=parent_v.id if parent_v else None,
-        file_path=str(version_file_path),
+        file_path=stored_path,
         sha256=sha256_hash,
         row_count=len(df_cleaned),
         column_count=len(df_cleaned.columns),
@@ -189,8 +206,8 @@ def perform_rollback(
 ) -> Tuple[DatasetModel, VersionModel]:
     """
     Safely rollback active dataset version to target_version.
-    Verifies file existence and SHA-256 integrity before changing active version.
-    Does NOT delete newer versions or files on disk.
+    Verifies storage existence and SHA-256 integrity before changing active version.
+    Does NOT delete newer versions or files.
     """
     target_ver_record = (
         db.query(VersionModel)
@@ -201,12 +218,13 @@ def perform_rollback(
     if not target_ver_record:
         raise ValueError(f"Version {target_version} does not exist for dataset '{dataset.id}'.")
 
-    target_path = Path(target_ver_record.file_path)
-    if not target_path.exists():
-        raise ValueError(f"Parquet storage file for Version {target_version} is missing on disk.")
+    try:
+        parquet_bytes = storage_service.download_bytes_sync(target_ver_record.file_path)
+    except StorageServiceError:
+        raise ValueError(f"Parquet storage file for Version {target_version} is missing from storage.")
 
     # Integrity verification via SHA-256
-    current_hash = calculate_file_sha256(target_path)
+    current_hash = hashlib.sha256(parquet_bytes).hexdigest()
     if current_hash != target_ver_record.sha256:
         raise ValueError(f"Integrity check failed: SHA-256 hash mismatch for Version {target_version}.")
 
@@ -232,3 +250,4 @@ def perform_rollback(
     db.commit()
     db.refresh(dataset)
     return dataset, target_ver_record
+

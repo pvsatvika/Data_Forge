@@ -17,14 +17,17 @@ class Settings(BaseSettings):
     GROQ_API_KEY: str = Field(default_factory=lambda: os.getenv("GROQ_API_KEY", ""))
     GROQ_MODEL: str = Field(default_factory=lambda: os.getenv("GROQ_MODEL", "openai/gpt-oss-120b"))
 
-    # Supabase Authentication Settings
+    # Supabase Authentication & Storage Settings
     SUPABASE_JWT_SECRET: str = Field(default_factory=lambda: os.getenv("SUPABASE_JWT_SECRET", ""))
+    SUPABASE_SERVICE_ROLE_KEY: str = Field(default_factory=lambda: os.getenv("SUPABASE_SERVICE_ROLE_KEY", ""))
     SUPABASE_URL: str = Field(default_factory=lambda: os.getenv("SUPABASE_URL", "https://tnmdiejiumwzxcndclmc.supabase.co"))
     SUPABASE_AUDIENCE: str = Field(default_factory=lambda: os.getenv("SUPABASE_AUDIENCE", "authenticated"))
+    STORAGE_MODE: str = Field(default_factory=lambda: os.getenv("STORAGE_MODE", "local"))
+    SUPABASE_STORAGE_BUCKET: str = Field(default_factory=lambda: os.getenv("SUPABASE_STORAGE_BUCKET", "data-forge-storage"))
 
     # Server & Database Settings
-    HOST: str = Field(default="0.0.0.0")
-    PORT: int = Field(default=8000)
+    HOST: str = Field(default_factory=lambda: os.getenv("HOST", "0.0.0.0"))
+    PORT: int = Field(default_factory=lambda: int(os.getenv("PORT", "8000")))
     DATABASE_URL: str = Field(default="sqlite:///./data/storage/data_forge.db")
     
     # Storage Paths

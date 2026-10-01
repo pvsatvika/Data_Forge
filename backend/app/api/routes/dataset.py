@@ -1,17 +1,20 @@
 import json
 import uuid
 import tempfile
+import io
 from pathlib import Path
 from datetime import datetime
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query, Response
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 import pandas as pd
 
 from app.config.settings import settings
+from app.storage.service import storage_service, StorageServiceError
 from app.db.session import get_db
+
 from app.db.models import (
     DatasetModel,
     AnalysisModel,
@@ -90,7 +93,7 @@ async def upload_dataset(
 ):
     """
     Ingest a CSV or XLSX dataset file for the authenticated user.
-    Calculates SHA-256, stores original file immutably, and attaches owner_id.
+    Calculates SHA-256, stores original file immutably in storage_service, and attaches owner_id.
     """
     if not file.filename:
         raise HTTPException(
@@ -112,12 +115,11 @@ async def upload_dataset(
     file_ext = validate_uploaded_file_header(clean_orig_filename, file_size)
 
     dataset_id = f"ds_{uuid.uuid4().hex[:12]}"
-    saved_filename = f"{dataset_id}{file_ext}"
-    storage_path = settings.UPLOAD_DIR / saved_filename
+    object_path = storage_service.get_original_object_path(dataset_id, clean_orig_filename)
 
+    content_type = "text/csv" if file_ext.lower() == ".csv" else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     try:
-        with open(storage_path, "wb") as f:
-            f.write(content)
+        storage_path = await storage_service.upload_bytes(object_path, content, content_type=content_type)
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -133,7 +135,7 @@ async def upload_dataset(
         file_type=file_ext,
         file_size=file_size,
         sha256=sha256_hash,
-        storage_path=str(storage_path),
+        storage_path=storage_path,
         upload_timestamp=datetime.utcnow(),
         status="uploaded",
         profile_status="pending",
@@ -146,8 +148,7 @@ async def upload_dataset(
         db.refresh(db_dataset)
     except Exception as e:
         db.rollback()
-        if storage_path.exists():
-            storage_path.unlink()
+        await storage_service.delete_object(storage_path)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to record dataset metadata in database."
@@ -196,15 +197,16 @@ async def get_or_generate_profile(
         except Exception:
             pass
 
-    storage_path = Path(db_dataset.storage_path)
-    if not storage_path.exists():
+    try:
+        file_bytes = await storage_service.download_bytes(db_dataset.storage_path)
+    except StorageServiceError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Dataset file is missing from server storage."
         )
 
     try:
-        df = load_dataset_dataframe(str(storage_path), db_dataset.file_type)
+        df = load_dataset_dataframe(file_bytes, db_dataset.file_type)
         profile = profile_dataset_dataframe(df, dataset_id)
     except Exception as e:
         db_dataset.profile_status = "failed"
@@ -244,21 +246,23 @@ async def analyze_dataset_with_ai(
             detail="Groq API key is not configured. Please set GROQ_API_KEY environment variable to enable AI semantic analysis."
         )
 
-    storage_path = Path(db_dataset.storage_path)
-    if not storage_path.exists():
+    try:
+        file_bytes = await storage_service.download_bytes(db_dataset.storage_path)
+    except StorageServiceError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Dataset storage file not found."
         )
 
     try:
-        df = load_dataset_dataframe(str(storage_path), db_dataset.file_type)
+        df = load_dataset_dataframe(file_bytes, db_dataset.file_type)
         profile = profile_dataset_dataframe(df, dataset_id)
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"Failed to extract dataset profile for AI analysis: {str(e)}"
         )
+
 
     analyzer = SemanticAnalyzer(client=groq_client)
     try:
@@ -457,14 +461,15 @@ async def preview_cleaning_plan_dry_run(
         )
 
     plan_obj = CleaningPlanResponse.model_validate(json.loads(db_plan.plan_json))
-    storage_path = Path(db_dataset.storage_path)
-    if not storage_path.exists():
+    try:
+        file_bytes = await storage_service.download_bytes(db_dataset.storage_path)
+    except StorageServiceError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Dataset storage file not found."
         )
 
-    df_orig = load_dataset_dataframe(str(storage_path), db_dataset.file_type)
+    df_orig = load_dataset_dataframe(file_bytes, db_dataset.file_type)
 
     loss_summary, stats_list, cell_diffs, truncated = run_dry_run_simulation(
         df_original=df_orig,
@@ -604,8 +609,15 @@ async def execute_approved_plan(
 
     preview_obj = PlanPreviewResponse.model_validate(json.loads(db_plan.preview_json))
 
-    storage_path = Path(db_dataset.storage_path)
-    df_orig = load_dataset_dataframe(str(storage_path), db_dataset.file_type)
+    try:
+        file_bytes = await storage_service.download_bytes(db_dataset.storage_path)
+    except StorageServiceError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Dataset storage file not found."
+        )
+
+    df_orig = load_dataset_dataframe(file_bytes, db_dataset.file_type)
 
     try:
         ensure_version_zero(db, db_dataset, df_orig)
@@ -725,10 +737,12 @@ async def get_dataset_version_history(
     """Retrieve complete immutable version history for owned dataset."""
     db_dataset = get_user_dataset_or_404(dataset_id, current_user.id, db)
 
-    storage_path = Path(db_dataset.storage_path)
-    if storage_path.exists():
-        df_orig = load_dataset_dataframe(str(storage_path), db_dataset.file_type)
+    try:
+        file_bytes = await storage_service.download_bytes(db_dataset.storage_path)
+        df_orig = load_dataset_dataframe(file_bytes, db_dataset.file_type)
         ensure_version_zero(db, db_dataset, df_orig)
+    except Exception:
+        pass
 
     db_versions = (
         db.query(VersionModel)
@@ -807,13 +821,16 @@ async def download_dataset_version(
     target_ver_num = version if version is not None else db_dataset.current_version
 
     if target_ver_num == 0:
-        file_path = Path(db_dataset.storage_path)
-        if not file_path.exists():
+        try:
+            file_bytes = await storage_service.download_bytes(db_dataset.storage_path)
+        except StorageServiceError:
             raise HTTPException(status_code=404, detail="Original dataset file not found.")
-        return FileResponse(
-            path=file_path,
-            filename=f"{db_dataset.original_filename}",
-            media_type="application/octet-stream"
+
+        media_type = "text/csv" if db_dataset.file_type.lower() == ".csv" else "application/octet-stream"
+        return Response(
+            content=file_bytes,
+            media_type=media_type,
+            headers={"Content-Disposition": f'attachment; filename="{db_dataset.original_filename}"'}
         )
     else:
         ver_record = (
@@ -824,19 +841,21 @@ async def download_dataset_version(
         if not ver_record:
             raise HTTPException(status_code=404, detail=f"Version {target_ver_num} not found for dataset.")
 
-        p_path = Path(ver_record.file_path)
-        if not p_path.exists():
-            raise HTTPException(status_code=404, detail=f"Version file missing on disk.")
+        try:
+            parquet_bytes = await storage_service.download_bytes(ver_record.file_path)
+        except StorageServiceError:
+            raise HTTPException(status_code=404, detail="Version file missing in storage.")
 
-        df_ver = pd.read_parquet(p_path)
-        temp_csv = tempfile.NamedTemporaryFile(delete=False, suffix=".csv")
-        df_ver.to_csv(temp_csv.name, index=False)
+        df_ver = pd.read_parquet(io.BytesIO(parquet_bytes))
+        csv_buffer = io.BytesIO()
+        df_ver.to_csv(csv_buffer, index=False)
+        out_bytes = csv_buffer.getvalue()
 
         out_name = f"data_forge_{dataset_id}_v{target_ver_num}.csv"
-        return FileResponse(
-            path=temp_csv.name,
-            filename=out_name,
-            media_type="text/csv"
+        return Response(
+            content=out_bytes,
+            media_type="text/csv",
+            headers={"Content-Disposition": f'attachment; filename="{out_name}"'}
         )
 
 @router.post("/history/{dataset_id}/clear", response_model=ClearHistoryResponse)
@@ -883,9 +902,8 @@ async def clear_dataset_history(
     deleted_versions_count = len(non_active_versions)
     for v in non_active_versions:
         try:
-            p = Path(v.file_path)
-            if p.exists() and p != Path(db_dataset.storage_path):
-                p.unlink()
+            if v.file_path != db_dataset.storage_path:
+                await storage_service.delete_object(v.file_path)
         except Exception:
             pass
         db.delete(v)
@@ -899,4 +917,5 @@ async def clear_dataset_history(
         message=f"History records successfully cleared for dataset '{dataset_id}'.",
         cleared_records=total_cleared
     )
+
 
