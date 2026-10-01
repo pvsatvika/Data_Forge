@@ -67,7 +67,7 @@ def test_valid_structured_ai_response_validation():
     result = ResponseValidator.validate_and_parse_response(
         raw_json_str=valid_json,
         dataset_id="ds_123",
-        model_used="llama-3.3-70b-versatile"
+        model_used="openai/gpt-oss-120b"
     )
 
     assert result.dataset_id == "ds_123"
@@ -101,7 +101,7 @@ def test_unsupported_operation_rejection_by_allowlist():
     result = ResponseValidator.validate_and_parse_response(
         raw_json_str=invalid_op_json,
         dataset_id="ds_123",
-        model_used="llama-3.3-70b-versatile"
+        model_used="openai/gpt-oss-120b"
     )
 
     # Only trim_whitespace should survive; delete_database_table MUST be filtered out
@@ -114,7 +114,7 @@ def test_malformed_json_response():
         ResponseValidator.validate_and_parse_response(
             raw_json_str=malformed_json,
             dataset_id="ds_123",
-            model_used="llama-3.3-70b-versatile"
+            model_used="openai/gpt-oss-120b"
         )
 
 def test_confidence_clamping():
@@ -134,7 +134,7 @@ def test_confidence_clamping():
     result = ResponseValidator.validate_and_parse_response(
         raw_json_str=raw_json,
         dataset_id="ds_123",
-        model_used="llama-3.3-70b-versatile"
+        model_used="openai/gpt-oss-120b"
     )
     assert result.recommendations[0].confidence == 1.0
 
@@ -243,5 +243,5 @@ async def test_groq_rate_limit_handling(client):
 def test_groq_model_configuration_is_supported():
     """Verify configured Groq model is supported and non-empty."""
     client = GroqClient()
-    assert client.model == "llama-3.3-70b-versatile"
+    assert client.model == "openai/gpt-oss-120b"
 
